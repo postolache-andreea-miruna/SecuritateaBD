@@ -1,0 +1,283 @@
+--gestiune utilizatori si resurse computationale
+
+/*
+1.	Utilizatorii aplicatiei:
+Sportivi 
+Antrenori 
+Arbitrii 
+Administratorul aplicatiei si al bazei de date 
+Publicul
+Reprezentanți companii 
+
+Toate conturile in afară de cel de guest si cel extern au setarea PASSWORD EXPIRE care obliga utilizatorul sa isi modifice parola la prima sa logare in cont, ceea ce reduce sansele sa se creada ca parola contului este cunoscuta de sys.
+
+2.	Spatii de stocare pentru utilizatorii creati
+
+Administratorul a primit spatiu nelimitat, avand in vedere ca in schema sa se afla toate tabelele, mai putin tabelul SPONSORIZEAZA care a fost creat in schema fiecarui sportiv.
+De asemenea, utilizatorii de tip sportiv si antrenor vor avea un spatiu de 4M.
+
+3.	Stabilirea accesului la resursele computaționale
+
+Se creează profiluri pentru rolurile create mai sus. Acestea folosesc o funcție custom de verificare a parolei care impune o lungime mai mare sau egala cu 8, sa aiba cel putin o literă mare, mica, cifra si un caracter special si sa nu contina username-ul. 
+In ceea ce priveste limitarile, acestea difera prin timpul conexiunii (cel mai mare trebuie avut de arbitru -170, urmat de antrenor si sportiv-120, cel mai mic fiind al reprezentantilor si guest - 60), al timpului de viata al parolei intre diferite tipuri de utilizatori. Limita pentru administrator va fi cea legata de verificarea parolei, restul vor fi default.
+
+*/
+--sys
+
+CREATE USER frnmp_app_admin IDENTIFIED BY parola PASSWORD EXPIRE; --parola dupa este Admin2025!
+GRANT CREATE SESSION TO frnmp_app_admin;
+
+desc dba_users
+select username, account_status, AUTHENTICATION_TYPE
+from dba_users;
+
+--conturi sportivi
+CREATE USER frnmp_app_sportiv1 IDENTIFIED BY parola PASSWORD EXPIRE; --parola dupa este Sportiv1!
+GRANT CREATE SESSION TO frnmp_app_sportiv1;
+
+CREATE USER frnmp_app_sportiv2 IDENTIFIED BY parola PASSWORD EXPIRE; --parola dupa este Sportiv2!
+GRANT CREATE SESSION TO frnmp_app_sportiv2;
+
+CREATE USER frnmp_app_sportiv3 IDENTIFIED BY parola PASSWORD EXPIRE; --parola dupa este Sportiv3!
+GRANT CREATE SESSION TO frnmp_app_sportiv3;
+
+CREATE USER frnmp_app_sportiv4 IDENTIFIED BY parola PASSWORD EXPIRE; --parola dupa este Sportiv4!
+GRANT CREATE SESSION TO frnmp_app_sportiv4;
+
+CREATE USER frnmp_app_sportiv5 IDENTIFIED BY parola PASSWORD EXPIRE; --parola dupa este Sportiv5!
+GRANT CREATE SESSION TO frnmp_app_sportiv5;
+
+--conturi antrenori
+CREATE USER frnmp_antrenor1 IDENTIFIED BY parola PASSWORD EXPIRE; -- pass: Antrenor1!
+GRANT CREATE SESSION TO frnmp_antrenor1;
+
+CREATE USER frnmp_antrenor2 IDENTIFIED BY parola PASSWORD EXPIRE;-- pass: Antrenor2!
+GRANT CREATE SESSION TO frnmp_antrenor2;
+
+CREATE USER frnmp_antrenor3 IDENTIFIED BY parola PASSWORD EXPIRE;-- pass: Antrenor3!
+GRANT CREATE SESSION TO frnmp_antrenor3;
+
+CREATE USER frnmp_antrenor4 IDENTIFIED BY parola PASSWORD EXPIRE;-- pass: Antrenor4!
+GRANT CREATE SESSION TO frnmp_antrenor4;
+
+--conturi arbitrii
+CREATE USER frnmp_arbitru1 IDENTIFIED BY parola PASSWORD EXPIRE; -- pass: Arbitru1!
+GRANT CREATE SESSION TO frnmp_arbitru1;
+
+CREATE USER frnmp_arbitru2 IDENTIFIED BY parola PASSWORD EXPIRE; -- pass: Arbitru2!
+GRANT CREATE SESSION TO frnmp_arbitru2;
+
+--conturi reprezentanti companii
+CREATE USER frnmp_reprezentant1 IDENTIFIED BY parola PASSWORD EXPIRE; -- pass: Reprezentant1!
+GRANT CREATE SESSION TO frnmp_reprezentant1;
+
+CREATE USER frnmp_reprezentant2 IDENTIFIED BY parola PASSWORD EXPIRE; -- pass: Reprezentant2!
+GRANT CREATE SESSION TO frnmp_reprezentant2;
+
+--cont guest
+CREATE USER frnmp_guest IDENTIFIED BY guest; -- pass: guest
+GRANT CREATE SESSION TO frnmp_guest;
+
+--cont extern
+SELECT value FROM v$parameter  
+WHERE name = 'os_authent_prefix'; --OPS$ 
+
+--echo %username%
+--mirun
+--
+--echo %USERDOMAIN%
+--MIRUNA
+
+--domeniu\username
+CREATE USER "OPS$MIRUNA\mirun" IDENTIFIED EXTERNALLY; 
+GRANT CREATE SESSION TO "OPS$MIRUNA\mirun";
+select username, account_status, AUTHENTICATION_TYPE
+from dba_users
+WHERE USERNAME LIKE '%FRNMP_%' OR USERNAME LIKE 'OPS$MIRUNA\mirun' ORDER BY CREATED;
+
+
+-- spatii de stocare pentru utilizatorii creati 
+--quota doar pentru cei care creeaza obiecte
+SELECT tablespace_name, ROUND(SUM(bytes) / 1048576) TotalSpace 
+FROM dba_data_files 
+GROUP BY tablespace_name; 
+
+ALTER USER frnmp_app_admin QUOTA unlimited ON users; 
+
+ALTER USER frnmp_app_sportiv1 QUOTA 4M ON users; 
+ALTER USER frnmp_app_sportiv2 QUOTA 4M ON users; 
+ALTER USER frnmp_app_sportiv3 QUOTA 4M ON users; 
+ALTER USER frnmp_app_sportiv4 QUOTA 4M ON users; 
+ALTER USER frnmp_app_sportiv5 QUOTA 4M ON users; 
+
+ALTER USER frnmp_antrenor1 QUOTA 4M ON users; 
+ALTER USER frnmp_antrenor2 QUOTA 4M ON users; 
+ALTER USER frnmp_antrenor3 QUOTA 4M ON users; 
+ALTER USER frnmp_antrenor4 QUOTA 4M ON users; 
+
+ALTER USER frnmp_arbitru1 QUOTA 0 ON users; 
+ALTER USER frnmp_arbitru2 QUOTA 0 ON users; 
+
+ALTER USER frnmp_reprezentant1 QUOTA 0 ON users; 
+ALTER USER frnmp_reprezentant2 QUOTA 0 ON users;
+
+ALTER USER frnmp_guest QUOTA 0 ON users;
+
+
+DESC DBA_TS_QUOTAS
+SELECT * FROM DBA_TS_QUOTAS
+where username in ('FRNMP_APP_ADMIN','FRNMP_APP_SPORTIV1','FRNMP_APP_SPORTIV2');
+
+--Stabilirea accesului la resurse computationale si alte configurari 
+
+SELECT * 
+FROM DBA_users;
+
+CREATE OR REPLACE FUNCTION my_verification_function (
+    numeuser      VARCHAR2, 
+    parola_noua   VARCHAR2, 
+    parola_veche  VARCHAR2
+) RETURN BOOLEAN AS
+    parola_curenta VARCHAR2(100);
+BEGIN
+
+    IF parola_noua = parola_veche THEN
+        RETURN FALSE;
+    END IF;
+
+    IF LENGTH(parola_noua) < 8 THEN
+        RETURN FALSE;
+    END IF;
+
+    IF REGEXP_LIKE(parola_noua, '[A-Z]') = FALSE THEN
+        RETURN FALSE;
+    END IF;
+
+    IF REGEXP_LIKE(parola_noua, '[a-z]') = FALSE THEN
+        RETURN FALSE;
+    END IF;
+    
+    IF REGEXP_LIKE(parola_noua, '[0-9]') = FALSE THEN
+        RETURN FALSE;
+    END IF;
+
+    IF REGEXP_LIKE(parola_noua, '[!@#$%^&*()_=+{}:;,.<>?/\|]') = fALSE THEN
+        RETURN FALSE;
+    END IF;
+
+    IF INSTR(parola_noua, numeuser) > 0 THEN
+        RETURN FALSE;
+    END IF;
+
+    RETURN TRUE;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN FALSE;
+    WHEN OTHERS THEN
+        RETURN FALSE;
+END my_verification_function;
+/
+
+CREATE PROFILE frnmp_sp_antr_profile LIMIT
+SESSIONS_PER_USER 1
+CPU_PER_CALL 6000
+CONNECT_TIME 120
+IDLE_TIME 10
+FAILED_LOGIN_ATTEMPTS 3
+PASSWORD_LIFE_TIME 120
+PASSWORD_GRACE_TIME 15
+PASSWORD_VERIFY_FUNCTION my_verification_function;
+
+CREATE PROFILE frnmp_arb_profile LIMIT
+SESSIONS_PER_USER 1
+CPU_PER_CALL 6000
+CONNECT_TIME 170
+IDLE_TIME 10
+FAILED_LOGIN_ATTEMPTS 3
+PASSWORD_LIFE_TIME 90
+PASSWORD_GRACE_TIME 15
+PASSWORD_VERIFY_FUNCTION my_verification_function;
+
+CREATE PROFILE frnmp_repr_profile LIMIT
+SESSIONS_PER_USER 1
+CPU_PER_CALL 6000
+CONNECT_TIME 60
+IDLE_TIME 10
+FAILED_LOGIN_ATTEMPTS 3
+PASSWORD_LIFE_TIME 90
+PASSWORD_GRACE_TIME 15
+PASSWORD_VERIFY_FUNCTION my_verification_function;
+
+CREATE PROFILE frnmp_guest_profile LIMIT
+SESSIONS_PER_USER 1
+CPU_PER_CALL 3500
+CONNECT_TIME 60
+IDLE_TIME 10;
+
+CREATE PROFILE frnmp_admin_profile LIMIT
+PASSWORD_VERIFY_FUNCTION my_verification_function;
+
+ALTER USER frnmp_app_sportiv1 PROFILE frnmp_sp_antr_profile;
+ALTER USER frnmp_app_sportiv2 PROFILE frnmp_sp_antr_profile;
+ALTER USER frnmp_app_sportiv3 PROFILE frnmp_sp_antr_profile;
+ALTER USER frnmp_app_sportiv4 PROFILE frnmp_sp_antr_profile;
+ALTER USER frnmp_app_sportiv5 PROFILE frnmp_sp_antr_profile;
+
+ALTER USER frnmp_antrenor1 PROFILE frnmp_sp_antr_profile;
+ALTER USER frnmp_antrenor2 PROFILE frnmp_sp_antr_profile;
+ALTER USER frnmp_antrenor3 PROFILE frnmp_sp_antr_profile;
+ALTER USER frnmp_antrenor4 PROFILE frnmp_sp_antr_profile;
+
+ALTER USER frnmp_arbitru1 PROFILE frnmp_arb_profile;
+ALTER USER frnmp_arbitru2 PROFILE frnmp_arb_profile;
+
+ALTER USER frnmp_reprezentant1 PROFILE frnmp_repr_profile;
+ALTER USER frnmp_reprezentant2 PROFILE frnmp_repr_profile;
+
+ALTER USER frnmp_guest PROFILE frnmp_guest_profile;
+
+ALTER USER frnmp_app_admin PROFILE frnmp_admin_profile;
+
+
+---- utilizator pentru a testa creare cont cu conditii parola
+--DROP USER frnmp_app_sp;
+--CREATE USER frnmp_app_sp IDENTIFIED BY parola PASSWORD EXPIRE; 
+--GRANT CREATE SESSION TO frnmp_app_sp;
+--ALTER USER frnmp_app_sp PROFILE frnmp_sp_antr_profile;
+--set serveroutput on;
+--
+--/
+--DECLARE
+--    result boolean;
+--BEGIN
+--    result := my_verification_function('frnmp_app_sp', 'Frnmp01234!', 'Frnmp0123');
+--    IF result = true THEN
+--        DBMS_OUTPUT.PUT_LINE('Parola poate fi schimbata.');
+--    ELSE
+--        DBMS_OUTPUT.PUT_LINE('Parola nu indeplineste conditiile.');
+--    END IF;
+--END;
+--/
+--ALTER USER frnmp_app_sp IDENTIFIED BY "Frnmp01234!";
+--
+--cum se procedeaza pentru schimbarea parolei daca este nevoie
+ALTER USER frnmp_app_sportiv1 IDENTIFIED BY "Sportiv1!";
+ALTER USER frnmp_app_sportiv2 IDENTIFIED BY "Sportiv2!";
+ALTER USER frnmp_app_sportiv3 IDENTIFIED BY "Sportiv3!";
+ALTER USER frnmp_app_sportiv4 IDENTIFIED BY "Sportiv4!";
+ALTER USER frnmp_app_sportiv5 IDENTIFIED BY "Sportiv5!";
+
+ALTER USER frnmp_antrenor1 IDENTIFIED BY "Antrenor1!";
+ALTER USER frnmp_antrenor2 IDENTIFIED BY "Antrenor2!";
+ALTER USER frnmp_antrenor3 IDENTIFIED BY "Antrenor3!";
+ALTER USER frnmp_antrenor4 IDENTIFIED BY "Antrenor4!";
+
+ALTER USER frnmp_arbitru1 IDENTIFIED BY "Arbitru1!";
+ALTER USER frnmp_arbitru2 IDENTIFIED BY "Arbitru2!";
+
+ALTER USER frnmp_reprezentant1 IDENTIFIED BY "Reprezentant1!";
+ALTER USER frnmp_reprezentant2 IDENTIFIED BY "Reprezentant2!";
+
+ALTER USER frnmp_app_admin IDENTIFIED BY "Admin2025!";
+

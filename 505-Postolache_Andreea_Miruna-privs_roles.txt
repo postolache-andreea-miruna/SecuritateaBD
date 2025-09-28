@@ -1,0 +1,262 @@
+--privilegii si roluri
+-- trebie sa respecte cele 3 matrici, iar granturile pentru 
+--crearea sesiunii fiecarui utilizator sunt in gestiune_identitati_resurse_comp.txt
+
+-- privilegii
+SELECT substr(grantee,1,20) grantee, owner,  
+substr(table_name,1,15) table_name,  
+grantor,privilege  
+FROM DBA_TAB_PRIVS  
+WHERE grantee like '%FRNMP%';
+
+--PENTRU ADMIN
+-- SA CREEZE TABELE IN SCHEMA LUI
+GRANT CREATE TABLE TO FRNMP_APP_ADMIN;
+GRANT CREATE ANY TABLE TO FRNMP_APP_ADMIN;
+GRANT CREATE ANY INDEX TO FRNMP_APP_ADMIN;
+--SA CREEZE ROLURI
+GRANT CREATE ROLE TO FRNMP_APP_ADMIN;
+
+--PENTRU A FACE TABELA SPONSORIZEAZA IN SCHEMA SPORTIVILOR
+GRANT REFERENCES ON FRNMP_APP_ADMIN.SPONSOR TO FRNMP_APP_SPORTIV1;
+GRANT REFERENCES ON FRNMP_APP_ADMIN.SPORTIV TO FRNMP_APP_SPORTIV1;
+
+GRANT REFERENCES ON FRNMP_APP_ADMIN.SPONSOR TO FRNMP_APP_SPORTIV2;
+GRANT REFERENCES ON FRNMP_APP_ADMIN.SPORTIV TO FRNMP_APP_SPORTIV2;
+
+GRANT REFERENCES ON FRNMP_APP_ADMIN.SPONSOR TO FRNMP_APP_SPORTIV3;
+GRANT REFERENCES ON FRNMP_APP_ADMIN.SPORTIV TO FRNMP_APP_SPORTIV3;
+
+GRANT REFERENCES ON FRNMP_APP_ADMIN.SPONSOR TO FRNMP_APP_SPORTIV4;
+GRANT REFERENCES ON FRNMP_APP_ADMIN.SPORTIV TO FRNMP_APP_SPORTIV4;
+
+GRANT REFERENCES ON FRNMP_APP_ADMIN.SPONSOR TO FRNMP_APP_SPORTIV5;
+GRANT REFERENCES ON FRNMP_APP_ADMIN.SPORTIV TO FRNMP_APP_SPORTIV5;
+
+--pentru a putea cripta
+GRANT EXECUTE ON DBMS_CRYPTO TO FRNMP_APP_ADMIN;
+GRANT CREATE TRIGGER TO FRNMP_APP_ADMIN;
+GRANT CREATE PROCEDURE TO FRNMP_APP_ADMIN;
+
+-- auditare
+GRANT AUDIT ANY TO FRNMP_APP_ADMIN;
+GRANT EXECUTE ON DBMS_FGA TO FRNMP_APP_ADMIN;
+------------------
+
+-- ANTRENORUL CARE VREA SA INSEREZE IN ISTORIC
+GRANT EXECUTE ON frnmp_app_admin.antrenor_insert_istoric TO frnmp_antrenor1;
+GRANT CREATE VIEW TO FRNMP_APP_ADMIN;
+GRANT SELECT ON frnmp_app_admin.view_sportivi_antrenor TO frnmp_antrenor1;
+GRANT SELECT ON frnmp_app_admin.view_competitie TO frnmp_antrenor1;
+GRANT SELECT ON frnmp_app_admin.view_proba TO frnmp_antrenor1;
+GRANT SELECT ON frnmp_app_admin.view_istoric_sportivi_antrenor TO frnmp_antrenor1;
+---
+GRANT SELECT ON frnmp_app_admin.CLUB TO frnmp_antrenor1,frnmp_antrenor2,frnmp_antrenor3,frnmp_antrenor4;
+GRANT SELECT ON frnmp_app_admin.CATEGORIE TO frnmp_antrenor1,frnmp_antrenor2,frnmp_antrenor3,frnmp_antrenor4;
+
+--arbitrul updateaza
+GRANT SELECT ON FRNMP_APP_ADMIN.ISTORIC TO FRNMP_ARBITRU1;
+GRANT SELECT ON frnmp_app_admin.view_istoric_arbitru TO FRNMP_ARBITRU1;
+GRANT UPDATE (loc_per_gen, loc_per_categorie, timp_total, puncte) ON FRNMP_APP_ADMIN.ISTORIC TO FRNMP_ARBITRU1;
+
+GRANT SELECT ON FRNMP_APP_ADMIN.ISTORIC TO FRNMP_ARBITRU2;
+GRANT SELECT ON frnmp_app_admin.view_istoric_arbitru TO FRNMP_ARBITRU2;
+GRANT UPDATE (loc_per_gen, loc_per_categorie, timp_total, puncte) ON FRNMP_APP_ADMIN.ISTORIC TO FRNMP_ARBITRU2;
+
+CREATE ROLE rol_arbitru_extins;
+
+GRANT SELECT ON FRNMP_APP_ADMIN.CLUB TO rol_arbitru_extins;
+GRANT SELECT ON FRNMP_APP_ADMIN.UTILIZATOR TO rol_arbitru_extins;
+GRANT SELECT ON FRNMP_APP_ADMIN.SPORTIV TO rol_arbitru_extins;
+GRANT SELECT ON FRNMP_APP_ADMIN.ANTRENOR TO rol_arbitru_extins;
+GRANT SELECT ON FRNMP_APP_ADMIN.PROBA TO rol_arbitru_extins;
+GRANT SELECT ON FRNMP_APP_ADMIN.COMPETITIE TO rol_arbitru_extins;
+GRANT SELECT ON FRNMP_APP_ADMIN.ISTORIC TO rol_arbitru_extins;
+GRANT SELECT ON FRNMP_APP_ADMIN.CATEGORIE TO rol_arbitru_extins;
+GRANT UPDATE (loc_per_gen, loc_per_categorie, timp_total, puncte) ON FRNMP_APP_ADMIN.ISTORIC TO rol_arbitru_extins;
+
+GRANT rol_arbitru_extins TO FRNMP_ARBITRU1,FRNMP_ARBITRU2;
+
+--PENTRU A INTRODUCE UN SPONSOR DATE IN TABELUL SPONSORIZEAZA CARE SE AFLA IN SCHEMELE SPORTIVILOR
+--GRANT CREATE VIEW TO FRNMP_APP_ADMIN; -- avuta deja
+GRANT SELECT ON frnmp_app_sportiv1.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+GRANT SELECT ON frnmp_app_sportiv2.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+GRANT SELECT ON frnmp_app_sportiv3.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+GRANT SELECT ON frnmp_app_sportiv4.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+GRANT SELECT ON frnmp_app_sportiv5.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+
+--se da reprezentatntilor de companii privilegiul de interogare al vizualizarii
+GRANT SELECT ON FRNMP_APP_ADMIN.VIZ_SPONSORIZARE TO frnmp_reprezentant1;
+--GRANT CREATE TRIGGER TO FRNMP_APP_ADMIN; --deja il aveam
+--admin trebuie sa poata insera date in tabela sponsorizeaza
+GRANT INSERT ON frnmp_app_sportiv1.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+GRANT INSERT ON frnmp_app_sportiv2.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+GRANT INSERT ON frnmp_app_sportiv3.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+GRANT INSERT ON frnmp_app_sportiv4.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+GRANT INSERT ON frnmp_app_sportiv5.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+--SYS ii da privilegiu de insert prin view catre reprezentantii de companii
+GRANT INSERT ON FRNMP_APP_ADMIN.VIZ_SPONSORIZARE TO frnmp_reprezentant1;
+--TREBUIE SA POATA FACE UPDATE
+GRANT UPDATE ON frnmp_app_sportiv1.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+GRANT UPDATE ON frnmp_app_sportiv2.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+GRANT UPDATE ON frnmp_app_sportiv3.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+GRANT UPDATE ON frnmp_app_sportiv4.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+GRANT UPDATE ON frnmp_app_sportiv5.SPONSORIZEAZA TO FRNMP_APP_ADMIN WITH GRANT OPTION;
+GRANT UPDATE ON FRNMP_APP_ADMIN.VIZ_SPONSORIZARE TO frnmp_reprezentant1;
+SELECT tablespace_name, 
+       file_name, 
+       bytes / 1024 / 1024 AS size_mb,
+       maxbytes / 1024 / 1024 AS max_size_mb
+FROM dba_data_files
+WHERE tablespace_name = 'USERS';
+
+
+--RULATE CA UTILIZATOR ADMIN
+CREATE ROLE inscrieri_sp;
+--privilegii date direct utilizatorului
+GRANT EXECUTE ON frnmp_app_admin.antrenor_insert_istoric TO frnmp_antrenor2;
+GRANT SELECT ON frnmp_app_admin.view_sportivi_antrenor TO frnmp_antrenor2;
+GRANT SELECT ON frnmp_app_admin.view_competitie TO frnmp_antrenor2;
+GRANT SELECT ON frnmp_app_admin.view_proba TO frnmp_antrenor2;
+GRANT SELECT ON frnmp_app_admin.view_istoric_sportivi_antrenor TO frnmp_antrenor2;
+-- privilegii date rolului
+GRANT EXECUTE ON frnmp_app_admin.antrenor_insert_istoric TO inscrieri_sp;
+GRANT SELECT ON frnmp_app_admin.view_sportivi_antrenor TO inscrieri_sp;
+GRANT SELECT ON frnmp_app_admin.view_competitie TO inscrieri_sp;
+GRANT SELECT ON frnmp_app_admin.view_proba TO inscrieri_sp;
+GRANT SELECT ON frnmp_app_admin.view_istoric_sportivi_antrenor TO inscrieri_sp;
+--acord rolul utilizatorului
+GRANT inscrieri_sp TO frnmp_antrenor2;
+--
+GRANT EXECUTE ON frnmp_app_admin.antrenor_insert_istoric TO frnmp_antrenor3;
+GRANT SELECT ON frnmp_app_admin.view_sportivi_antrenor TO frnmp_antrenor3;
+GRANT SELECT ON frnmp_app_admin.view_competitie TO frnmp_antrenor3;
+GRANT SELECT ON frnmp_app_admin.view_proba TO frnmp_antrenor3;
+GRANT SELECT ON frnmp_app_admin.view_istoric_sportivi_antrenor TO frnmp_antrenor3;
+--
+GRANT EXECUTE ON frnmp_app_admin.antrenor_insert_istoric TO frnmp_antrenor4;
+GRANT SELECT ON frnmp_app_admin.view_sportivi_antrenor TO frnmp_antrenor4;
+GRANT SELECT ON frnmp_app_admin.view_competitie TO frnmp_antrenor4;
+GRANT SELECT ON frnmp_app_admin.view_proba TO frnmp_antrenor4;
+GRANT SELECT ON frnmp_app_admin.view_istoric_sportivi_antrenor TO frnmp_antrenor4;
+GRANT inscrieri_sp TO frnmp_antrenor4;
+
+
+-- P6
+CREATE ROLE vizualizari_rezultate;
+GRANT SELECT ON frnmp_app_admin.CLUB TO vizualizari_rezultate;
+GRANT SELECT ON frnmp_app_admin.SPORTIV TO vizualizari_rezultate;
+GRANT SELECT ON frnmp_app_admin.UTILIZATOR TO vizualizari_rezultate;
+GRANT SELECT ON frnmp_app_admin.ANTRENOR TO vizualizari_rezultate;
+GRANT SELECT ON frnmp_app_admin.PROBA TO vizualizari_rezultate;
+GRANT SELECT ON frnmp_app_admin.COMPETITIE TO vizualizari_rezultate;
+GRANT SELECT ON frnmp_app_admin.ISTORIC TO vizualizari_rezultate;
+GRANT SELECT ON frnmp_app_admin.CATEGORIE TO vizualizari_rezultate;
+
+GRANT vizualizari_rezultate TO frnmp_app_sportiv1;
+
+--REVOKE vizualizari_rezultate from frnmp_app_sportiv1;
+
+GRANT SELECT ON frnmp_app_admin.CLUB TO frnmp_app_sportiv2;
+GRANT SELECT ON frnmp_app_admin.SPORTIV TO frnmp_app_sportiv2;
+GRANT SELECT ON frnmp_app_admin.UTILIZATOR TO frnmp_app_sportiv2;
+GRANT SELECT ON frnmp_app_admin.ANTRENOR TO frnmp_app_sportiv2;
+GRANT SELECT ON frnmp_app_admin.PROBA TO frnmp_app_sportiv2;
+GRANT SELECT ON frnmp_app_admin.COMPETITIE TO frnmp_app_sportiv2;
+GRANT SELECT ON frnmp_app_admin.ISTORIC TO frnmp_app_sportiv2;
+GRANT SELECT ON frnmp_app_admin.CATEGORIE TO frnmp_app_sportiv2;
+GRANT vizualizari_rezultate TO frnmp_app_sportiv2;
+
+GRANT EXECUTE ON frnmp_app_admin.vizualizare_rezultate_per_categorie TO frnmp_app_sportiv3,frnmp_app_sportiv4,frnmp_app_sportiv5;
+GRANT EXECUTE ON frnmp_app_admin.vizualizare_rezultate_per_categorie TO frnmp_antrenor1,frnmp_antrenor2,frnmp_antrenor3,frnmp_antrenor4;
+GRANT EXECUTE ON frnmp_app_admin.vizualizare_rezultate_per_categorie TO frnmp_arbitru1,frnmp_arbitru2,frnmp_reprezentant1,frnmp_reprezentant2,frnmp_guest;
+
+--P7 CU EXECUTE A TREIA METODA (pentru sportivul 1 si 2 au ramas granturile si rolurile date pentru p6)
+GRANT EXECUTE ON frnmp_app_admin.vizualizare_rezultate_per_gen__si_total_puncte TO frnmp_app_sportiv3,frnmp_app_sportiv4,frnmp_app_sportiv5;
+GRANT EXECUTE ON frnmp_app_admin.vizualizare_rezultate_per_gen__si_total_puncte TO frnmp_antrenor1,frnmp_antrenor2,frnmp_antrenor3,frnmp_antrenor4;
+GRANT EXECUTE ON frnmp_app_admin.vizualizare_rezultate_per_gen__si_total_puncte TO frnmp_arbitru1,frnmp_arbitru2,frnmp_reprezentant1,frnmp_reprezentant2,frnmp_guest;
+
+--P8 pentru restul de sportivi (3,4,5), antrenori, public si reprezentant companie
+GRANT EXECUTE ON frnmp_app_admin.get_best_times_for_sportiv TO frnmp_app_sportiv3,frnmp_app_sportiv4,frnmp_app_sportiv5;
+GRANT EXECUTE ON frnmp_app_admin.get_best_times_for_sportiv TO frnmp_antrenor1,frnmp_antrenor2,frnmp_antrenor3,frnmp_antrenor4,frnmp_reprezentant1,frnmp_reprezentant2,frnmp_guest;
+
+--p9
+GRANT EXECUTE ON frnmp_app_admin.evolutie_sportiv TO frnmp_app_sportiv3,frnmp_app_sportiv4,frnmp_app_sportiv5;
+GRANT EXECUTE ON frnmp_app_admin.evolutie_sportiv TO frnmp_antrenor1,frnmp_antrenor2,frnmp_antrenor3,frnmp_antrenor4,frnmp_reprezentant1,frnmp_reprezentant2,frnmp_guest;
+
+--p10
+GRANT EXECUTE ON frnmp_app_admin.top_cluburi TO frnmp_app_sportiv3,frnmp_app_sportiv4,frnmp_app_sportiv5;
+GRANT EXECUTE ON frnmp_app_admin.top_cluburi TO frnmp_antrenor1,frnmp_antrenor2,frnmp_antrenor3,frnmp_antrenor4,frnmp_guest;
+--revoke EXECUTE ON frnmp_app_admin.top_cluburi from frnmp_reprezentant1,frnmp_reprezentant2;
+
+--p11
+GRANT EXECUTE ON frnmp_app_admin.top_sportivi_an_cl_proba TO frnmp_app_sportiv3,frnmp_app_sportiv4,frnmp_app_sportiv5;
+GRANT EXECUTE ON frnmp_app_admin.top_sportivi_an_cl_proba TO frnmp_antrenor1,frnmp_antrenor2,frnmp_antrenor3,frnmp_antrenor4,frnmp_reprezentant1,frnmp_reprezentant2,frnmp_guest;
+
+--p12
+GRANT SELECT ON frnmp_app_admin.CLUB TO frnmp_reprezentant1;--de la p6
+GRANT SELECT ON frnmp_app_admin.ANTRENOR TO frnmp_reprezentant1;--de la p6
+GRANT SELECT ON frnmp_app_admin.PROBA TO frnmp_reprezentant1;--de la p6
+GRANT SELECT ON frnmp_app_admin.CATEGORIE TO frnmp_reprezentant1;--de la p6
+
+GRANT SELECT ON frnmp_app_admin.SPORTIV TO frnmp_reprezentant1;
+GRANT SELECT ON frnmp_app_admin.UTILIZATOR TO frnmp_reprezentant1;
+GRANT SELECT ON frnmp_app_admin.COMPETITIE TO frnmp_reprezentant1;
+GRANT SELECT ON frnmp_app_admin.ISTORIC TO frnmp_reprezentant1;
+GRANT SELECT ON frnmp_app_admin.ORAS TO frnmp_reprezentant1;
+GRANT SELECT ON frnmp_app_admin.TARA TO frnmp_reprezentant1;
+GRANT SELECT ON frnmp_app_admin.TIP TO frnmp_reprezentant1;
+GRANT SELECT ON frnmp_app_admin.SPONSOR TO frnmp_reprezentant1;
+GRANT SELECT ON FRNMP_APP_ADMIN.VIZ_SPONSORIZARE_2 TO frnmp_reprezentant1;
+
+CREATE ROLE viz_sponsoriz;
+GRANT SELECT ON frnmp_app_admin.CLUB TO viz_sponsoriz;
+GRANT SELECT ON frnmp_app_admin.ANTRENOR TO viz_sponsoriz;
+GRANT SELECT ON frnmp_app_admin.PROBA TO viz_sponsoriz;
+GRANT SELECT ON frnmp_app_admin.CATEGORIE TO viz_sponsoriz;
+
+GRANT SELECT ON frnmp_app_admin.SPORTIV TO viz_sponsoriz;
+GRANT SELECT ON frnmp_app_admin.UTILIZATOR TO viz_sponsoriz;
+GRANT SELECT ON frnmp_app_admin.COMPETITIE TO viz_sponsoriz;
+GRANT SELECT ON frnmp_app_admin.ISTORIC TO viz_sponsoriz;
+GRANT SELECT ON frnmp_app_admin.ORAS TO viz_sponsoriz;
+GRANT SELECT ON frnmp_app_admin.TARA TO viz_sponsoriz;
+GRANT SELECT ON frnmp_app_admin.TIP TO viz_sponsoriz;
+GRANT SELECT ON frnmp_app_admin.SPONSOR TO viz_sponsoriz;
+GRANT SELECT ON FRNMP_APP_ADMIN.VIZ_SPONSORIZARE_2 TO viz_sponsoriz;
+
+GRANT viz_sponsoriz TO frnmp_reprezentant1;
+GRANT SELECT,INSERT ON FRNMP_APP_ADMIN.VIZ_SPONSORIZARE TO frnmp_reprezentant2;
+
+create role insert_viz_spons_repr;
+grant viz_sponsoriz to insert_viz_spons_repr;
+GRANT SELECT,INSERT ON FRNMP_APP_ADMIN.VIZ_SPONSORIZARE TO insert_viz_spons_repr;
+GRANT UPDATE ON FRNMP_APP_ADMIN.VIZ_SPONSORIZARE TO insert_viz_spons_repr;
+
+GRANT insert_viz_spons_repr TO frnmp_reprezentant2;
+
+--p17
+--antrenor1
+GRANT SELECT ON frnmp_app_admin.SPORTIV TO frnmp_antrenor1;
+GRANT SELECT ON frnmp_app_admin.ANTRENOR TO frnmp_antrenor1;
+GRANT SELECT ON frnmp_app_admin.PROBA TO frnmp_antrenor1;
+GRANT SELECT ON frnmp_app_admin.COMPETITIE TO frnmp_antrenor1;
+GRANT SELECT ON frnmp_app_admin.ISTORIC TO frnmp_antrenor1;
+GRANT SELECT ON frnmp_app_admin.UTILIZATOR TO frnmp_antrenor1;
+
+CREATE ROLE vizualizari_best_proba_de_antrenor;
+
+GRANT SELECT ON frnmp_app_admin.SPORTIV TO vizualizari_best_proba_de_antrenor;
+GRANT SELECT ON frnmp_app_admin.UTILIZATOR TO vizualizari_best_proba_de_antrenor;
+GRANT SELECT ON frnmp_app_admin.ANTRENOR TO vizualizari_best_proba_de_antrenor;
+GRANT SELECT ON frnmp_app_admin.PROBA TO vizualizari_best_proba_de_antrenor;
+GRANT SELECT ON frnmp_app_admin.COMPETITIE TO vizualizari_best_proba_de_antrenor;
+GRANT SELECT ON frnmp_app_admin.ISTORIC TO vizualizari_best_proba_de_antrenor;
+
+GRANT vizualizari_best_proba_de_antrenor TO frnmp_antrenor1,frnmp_antrenor2,frnmp_antrenor3,frnmp_antrenor4;
+GRANT vizualizari_best_proba_de_antrenor TO frnmp_reprezentant1,frnmp_reprezentant2,frnmp_guest;
+
+
+--context
+create or replace directory DIREXP AS 'D:\An2Master\securitate\Securitateproiect\mascarefolder'; --sys
+GRANT READ,WRITE ON DIRECTORY DIREXP TO frnmp_app_admin;

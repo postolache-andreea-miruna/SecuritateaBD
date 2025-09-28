@@ -1,0 +1,270 @@
+--audit
+
+-- SYS
+
+--a. Auditare standard
+
+select value from v$parameter where name ='audit_trail'; --DB
+show parameter audit_trail;
+--vrem DB,EXTENDED pentru a stoca si textul comenzilor
+
+alter system set audit_trail=db,extended
+scope=spfile;
+--diconnect sys_orcl
+--din sqlplus se da shutdown immediate si startup
+--connect sys_orcl
+select value from v$parameter where name ='audit_trail'; --DB,EXTENDED
+
+ 
+--Cerere pentru auditare standard  
+--Sa se monitorizeze toate activitatile de creare a tabelelor pentru administrator, 
+--pentru tabelul utilizator, club si sponsor sa se monitorizeze inserarile care esueaza, 
+--iar pentru tabelul istoric sa se monitorizeze oricand activitatile de interogare, adaugare de date
+--si activitatile de actualizare.Datele monitorizate vor fi stocate in baza de date.
+ 
+AUDIT CREATE TABLE BY FRNMP_APP_ADMIN;
+
+AUDIT INSERT ON FRNMP_APP_ADMIN.UTILIZATOR 
+WHENEVER NOT SUCCESSFUL;
+
+AUDIT INSERT ON FRNMP_APP_ADMIN.SPONSOR
+WHENEVER NOT SUCCESSFUL;
+
+AUDIT INSERT ON FRNMP_APP_ADMIN.CLUB 
+WHENEVER NOT SUCCESSFUL;
+
+AUDIT SELECT,INSERT,UPDATE ON FRNMP_APP_ADMIN.ISTORIC;
+
+--DEZACTIVARE
+--NOAUDIT INSERT ON FRNMP_APP_ADMIN.SPONSOR WHENEVER NOT SUCCESSFUL;
+--NOAUDIT CREATE TABLE BY FRNMP_APP_ADMIN;
+--NOAUDIT ALL;
+
+--Pentru a vedea rezultatele auditului
+SELECT * FROM DBA_AUDIT_TRAIL;
+
+SELECT * FROM DBA_AUDIT_TRAIL
+where username ='FRNMP_APP_ADMIN';
+
+SELECT * FROM DBA_AUDIT_TRAIL
+where username ='FRNMP_ARBITRU1';
+
+SELECT * FROM DBA_AUDIT_TRAIL
+where username ='FRNMP_ANTRENOR1';
+
+--pentru a vedea ca auditarile exista
+select * from DBA_OBJ_AUDIT_OPTS
+where owner ='FRNMP_APP_ADMIN';
+
+--exemplu de declansare a auditarii: se incearca inserarea cu aceeasi cheie primara din administrator
+INSERT INTO CLUB
+VALUES(3, 'BUCHAREST SPORT CLUB ELITE','Excelenta cu fiecare lovitura, succes in fiecare cursa');
+INSERT INTO CLUB
+VALUES(3, 'BUCHAREST SPORT CLUB ELITE','Excelenta cu fiecare lovitura, succes in fiecare cursa');
+
+--b Trigger-i de auditare
+
+--Inregistreaza in tabelul audit informatii despre LMD care stabilesc un numar de
+--puncte mai mare de 15 in istoricul sportivilor cu participari la competitii de tipul LOCAL
+--sau cu numar mai mare de 150 de puncte in istoricul sportivilor cu participari la competitii cu unul din tipurile: MONDIAL, EUROPEAN.
+--Mai mult creeaza un tabel de audit care sa il extinda pe primul prin adaugarea de informatii
+--cu privire la datele inserate sau modificate pentru tabelul istoric care respecta conditionarile de mai sus.
+
+
+CREATE TABLE TAB_AUDIT_ISTORIC (
+    cod_audit_ist NUMBER(4) PRIMARY KEY,
+    utilizator_ VARCHAR2(30) NOT NULL,  
+    sesiune_ NUMBER(10) NOT NULL,      
+    host_ VARCHAR2(50) NOT NULL,        
+    data_ DATE NOT NULL,                
+    nr_randuri_neregula NUMBER(5),     
+    operatie VARCHAR2(10) NOT NULL      
+);
+
+CREATE TABLE TAB_AUDIT_ISTORIC_DETALIAT (
+    cod_audit_ist_det NUMBER(4) PRIMARY KEY,
+    nume_competitie VARCHAR2(30) NOT NULL, 
+    puncte_ist NUMBER(5),            
+    tip_competitie VARCHAR2(20),         
+    nume_proba VARCHAR2(30),
+    data_operatie DATE NOT NULL,       
+    CONSTRAINT fk_aud_ist_det FOREIGN KEY (cod_audit_ist_det) REFERENCES TAB_AUDIT_ISTORIC(cod_audit_ist)
+);
+select * from TAB_AUDIT_ISTORIC;
+select * from TAB_AUDIT_ISTORIC_DETALIAT;
+
+CREATE SEQUENCE SEQ_AUDIT_ISTORIC
+START WITH 1
+INCREMENT BY 1;
+
+
+CREATE OR REPLACE TRIGGER trigger_istoric_audit
+FOR INSERT OR UPDATE ON FRNMP_APP_ADMIN.ISTORIC
+COMPOUND TRIGGER
+    v_nr_puncte NUMBER := 0;
+    v_tip_op VARCHAR2(10);
+    v_audit_id NUMBER;
+    
+    BEFORE STATEMENT IS
+    BEGIN
+
+        IF INSERTING THEN
+            v_tip_op := 'INSERT';
+        ELSE  
+            v_tip_op := 'UPDATE';
+        END IF;
+        SELECT SEQ_AUDIT_ISTORIC.NEXTVAL INTO v_audit_id FROM DUAL;
+    END BEFORE STATEMENT;
+
+    AFTER STATEMENT IS
+    BEGIN
+
+        SELECT COUNT(*) INTO v_nr_puncte 
+        FROM FRNMP_APP_ADMIN.ISTORIC ist
+        JOIN FRNMP_APP_ADMIN.COMPETITIE compe ON ist.cod_competitie = compe.cod_competitie
+        JOIN FRNMP_APP_ADMIN.TIP tip_ ON compe.cod_tip = tip_.cod_tip
+        WHERE ((ist.puncte > 15 AND UPPER(tip_.tip_competitie) = 'LOCAL')
+               OR (ist.puncte > 150 AND UPPER(tip_.tip_competitie) IN ('EUROPEAN', 'MONDIAL')));
+
+
+        INSERT INTO TAB_AUDIT_ISTORIC (
+            cod_audit_ist, utilizator_, sesiune_, host_, data_, nr_randuri_neregula, operatie
+        ) VALUES (
+            v_audit_id,
+            SYS_CONTEXT('USERENV', 'SESSION_USER'),
+            SYS_CONTEXT('USERENV', 'SESSIONID'),
+            SYS_CONTEXT('USERENV', 'HOST'),
+            SYSDATE,
+            v_nr_puncte,
+            v_tip_op
+        );
+        
+        
+        INSERT INTO TAB_AUDIT_ISTORIC_DETALIAT (
+            cod_audit_ist_det, nume_competitie, puncte_ist, tip_competitie, nume_proba, data_operatie
+        )
+        SELECT 
+            v_audit_id,
+            compe.nume,
+            ist.puncte,
+            tip_.tip_competitie,
+            prob.nume,
+            SYSDATE
+        FROM FRNMP_APP_ADMIN.ISTORIC ist
+        JOIN FRNMP_APP_ADMIN.PROBA prob ON ist.cod_proba = prob.cod_proba
+        JOIN FRNMP_APP_ADMIN.COMPETITIE compe ON ist.cod_competitie = compe.cod_competitie
+        JOIN FRNMP_APP_ADMIN.TIP tip_ ON compe.cod_tip = tip_.cod_tip
+        WHERE (ist.puncte > 15 AND UPPER(tip_.tip_competitie) = 'LOCAL')
+           OR (ist.puncte > 150 AND UPPER(tip_.tip_competitie) IN ('EUROPEAN', 'MONDIAL'));
+
+    END AFTER STATEMENT;
+
+END;
+/
+commit;
+ 
+--exemplu de declansare rulat ca frnmp_arbitru1
+select * from frnmp_app_admin.view_istoric_arbitru;
+set SERVEROUTPUT on;
+UPDATE frnmp_app_admin.istoric
+SET loc_per_gen = 15,loc_per_categorie=3,timp_total=26,puncte=170
+WHERE cod_competitie = 1 and cod_sportiv = 5 and cod_proba = 1; --ESTE COMPETITIE MONDIALA SI MAXIMUL ESTE DE 150 DE PUNCTE,
+COMMIT;
+--IAR ACUM ESTE DECLANSAT TRIGGERUL AUDIT SI POLITICA DE AUDIT policy_istoric si auditul standard
+
+--c Politici de auditare
+
+--Creati o politica de auditare pentru a inregistra operatiile de modificare a 
+--datei de desfasurare a competitiilor in tabela competitie si afisati un mesaj corespunzator 
+--si o alta politica de auditare pentru a inregistra operatiile de modificare a locurilor si 
+--punctelor obtinute de sportiv in concurs la proba la care a participat din tabelul istoric
+--si afisati un mesaj corespunzator.
+
+SELECT POLICY_TEXT,ENABLED,POLICY_NAME FROM ALL_AUDIT_POLICIES ;
+set serveroutput on;
+
+--procedura rulata logat ca frnmp_app_admin
+create or replace procedure proc_audit_alert
+( object_schema VARCHAR2, object_name VARCHAR2, policy_name VARCHAR2 )is
+begin
+dbms_output.put_line('Modificare date competitie');
+end;
+/
+--logat iar la sys_orcl
+begin
+    dbms_fga.add_policy(
+        object_schema=>'frnmp_app_admin',
+        object_name=>'COMPETITIE',
+        policy_name=>'policy_competitie',
+        audit_column=>'data_start,data_final',
+        enable=> TRUE,
+        statement_types=>'UPDATE',
+        handler_schema=>'frnmp_app_admin',
+        handler_module=>'proc_audit_alert'
+    );
+end;
+/
+--procedura rulata logat ca frnmp_app_admin
+create or replace procedure proc_audit_alert_ist
+( object_schema VARCHAR2, object_name VARCHAR2, policy_name VARCHAR2 )is
+begin
+dbms_output.put_line('Modificare loc si puncte istoric');
+end;
+/
+--logat iar la sys_orcl
+begin
+    dbms_fga.add_policy(
+        object_schema=>'frnmp_app_admin',
+        object_name=>'ISTORIC',
+        policy_name=>'policy_istoric',
+        audit_column=>'loc_per_gen,loc_per_categorie,puncte',
+        enable=> TRUE,
+        statement_types=>'UPDATE',
+        handler_schema=>'frnmp_app_admin',
+        handler_module=>'proc_audit_alert_ist'
+    );
+end;
+/
+SELECT POLICY_TEXT,ENABLED FROM ALL_AUDIT_POLICIES 
+WHERE OBJECT_NAME='ISTORIC'; 
+
+--verificare ce au inregistrat politicile de audit
+SELECT * FROM DBA_FGA_AUDIT_TRAIL;
+
+--cum se da drop la policy
+--begin
+--   DBMS_FGA.drop_policy (object_schema      => 'frnmp_app_admin',
+--                            object_name        => 'ISTORIC',
+--                            policy_name        => 'policy_istoric'
+--                           );
+--end;
+--/
+--
+--begin
+--   DBMS_FGA.drop_policy (object_schema      => 'frnmp_app_admin',
+--                            object_name        => 'COMPETITIE',
+--                            policy_name        => 'policy_competitie'
+--                           );
+--end;
+--/
+
+/*
+politica de audit pentru istoric este apelata mereu cand arbitrul face update la istoric
+mai jos exemplu pentru politica de audit pentru competitie
+*/
+--ca administrator PENTRU A TESTA POLITICA AUDIT  
+set serveroutput on;
+INSERT INTO COMPETITIE(cod_competitie,nume,data_start,data_final,cod_oras,cod_tip)
+VALUES(4,'CUPA DE PRIMAVARA 2025',TO_DATE('03-03-2025','DD-MM-YYYY'),TO_DATE('04-03-2025','DD-MM-YYYY'),4,4);
+COMMIT;
+UPDATE frnmp_app_admin.competitie
+SET data_final = TO_DATE('05-03-2025','DD-MM-YYYY')
+WHERE cod_competitie = 4;
+COMMIT;
+
+DELETE FROM competitie
+WHERE cod_competitie = 4;
+
+select * from competitie;
+commit;
+

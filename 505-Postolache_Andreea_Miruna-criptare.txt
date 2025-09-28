@@ -1,0 +1,237 @@
+--criptare
+/*
+Se vor scrie doua proceduri pentru criptare respectiv decriptare pentru atributul suma_contributie din tabelul SPONSOR, si alte doua proceduri pentru atributul CNP al tabelului UTILIZATOR. La decriptare se doreste ca introducandu-se numele sponsorului sa se afle suma decriptata, iar pentru tabela UTILIZATOR se doreste ca prin introducerea username-ului sa se afle CNP-ul decriptat. Mai mult, cheile de criptare sunt specifice per tabel si vor fi salvate intr-un tabel unde se va mentiona valoarea cheii si numele tabelului unde se aplica. Datele vor fi criptate cu AES-128, PAD_PKCS5, CHAIN_CBC. Aceste proceduri de criptare vor fi folosite in inserarea datelor.
+*/
+
+--administrator
+
+CREATE TABLE CHEIE_CRIPT_DECR (
+    id_cheie NUMBER(5) PRIMARY KEY,
+    cheie_val RAW(128),
+    tabel VARCHAR2(50) UNIQUE
+);
+
+
+CREATE OR REPLACE FUNCTION CRIPTARE_SUMA_ADM(
+    suma_contributie NUMBER
+) RETURN RAW IS
+    cheie_actuala RAW(128);
+    nr_chei NUMBER;
+    mod_operare PLS_INTEGER := DBMS_CRYPTO.ENCRYPT_AES128 + 
+                          DBMS_CRYPTO.PAD_PKCS5 + 
+                          DBMS_CRYPTO.CHAIN_CBC;
+BEGIN
+    SELECT COUNT(*) INTO nr_chei 
+    FROM CHEIE_CRIPT_DECR 
+    WHERE tabel = 'SPONSOR';
+    
+     IF nr_chei = 0 THEN
+        cheie_actuala := DBMS_CRYPTO.RANDOMBYTES(16);
+        
+        INSERT INTO CHEIE_CRIPT_DECR (id_cheie, cheie_val, tabel)
+        VALUES (
+            (SELECT NVL(MAX(id_cheie), 0) + 1 FROM CHEIE_CRIPT_DECR), 
+            cheie_actuala, 
+            'SPONSOR'
+        );
+    ELSE
+    
+        SELECT cheie_val INTO cheie_actuala 
+        FROM CHEIE_CRIPT_DECR 
+        WHERE tabel = 'SPONSOR';
+    END IF;
+
+    RETURN DBMS_CRYPTO.ENCRYPT(
+         UTL_I18N.STRING_TO_RAW(TO_CHAR(suma_contributie)),
+         mod_operare,
+         cheie_actuala
+    );
+END;
+/
+CREATE OR REPLACE FUNCTION DECRIPTARE_SUMA_ADM(
+    nume_sponsor VARCHAR2
+) RETURN NUMBER IS
+    suma_contrib RAW(128);
+    cheie_actuala RAW(128);
+    mod_operare PLS_INTEGER := DBMS_CRYPTO.ENCRYPT_AES128 + 
+                          DBMS_CRYPTO.PAD_PKCS5 + 
+                          DBMS_CRYPTO.CHAIN_CBC;
+BEGIN
+
+    SELECT suma_contributie INTO suma_contrib
+    FROM SPONSOR
+    WHERE nume = nume_sponsor;
+    
+    SELECT cheie_val INTO cheie_actuala 
+    FROM CHEIE_CRIPT_DECR 
+    WHERE tabel = 'SPONSOR';
+
+
+    RETURN TO_NUMBER(UTL_I18N.RAW_TO_CHAR( 
+        DBMS_CRYPTO.decrypt(
+            suma_contrib,
+            mod_operare,
+            cheie_actuala
+         ),
+     'AL32UTF8'));
+END;
+/
+
+INSERT INTO SPONSOR(cod_sponsor,nume,suma_contributie)
+VALUES (1,'RED BULL',CRIPTARE_SUMA_ADM(500));
+
+INSERT INTO SPONSOR(cod_sponsor,nume,suma_contributie)
+VALUES (2,'ISOSTAR',CRIPTARE_SUMA_ADM(600.4));
+--delete from sponsor;
+--select * from sponsor;
+
+SELECT DECRIPTARE_SUMA_ADM('RED BULL') 
+FROM dual;
+
+SELECT DECRIPTARE_SUMA_ADM('ISOSTAR') 
+FROM dual;
+
+--pentru tabel UTILIZATOR
+CREATE OR REPLACE FUNCTION CRIPTARE_UTILIZ_ADM(
+    cnp_ul VARCHAR2
+) RETURN RAW IS
+    cheie_actuala RAW(128);
+    nr_chei NUMBER;
+    mod_operare PLS_INTEGER := DBMS_CRYPTO.ENCRYPT_AES128 + 
+                          DBMS_CRYPTO.PAD_PKCS5 + 
+                          DBMS_CRYPTO.CHAIN_CBC;
+BEGIN
+    SELECT COUNT(*) INTO nr_chei 
+    FROM CHEIE_CRIPT_DECR 
+    WHERE tabel = 'UTILIZATOR';
+    
+     IF nr_chei = 0 THEN
+        cheie_actuala := DBMS_CRYPTO.RANDOMBYTES(16);
+        
+        INSERT INTO CHEIE_CRIPT_DECR (id_cheie, cheie_val, tabel)
+        VALUES (
+            (SELECT NVL(MAX(id_cheie), 0) + 1 FROM CHEIE_CRIPT_DECR), 
+            cheie_actuala, 
+            'UTILIZATOR'
+        );
+    ELSE
+    
+        SELECT cheie_val INTO cheie_actuala 
+        FROM CHEIE_CRIPT_DECR 
+        WHERE tabel = 'UTILIZATOR';
+    END IF;
+
+    RETURN DBMS_CRYPTO.ENCRYPT(
+         UTL_I18N.STRING_TO_RAW(cnp_ul),
+         mod_operare,
+         cheie_actuala
+    );
+END;
+/
+
+
+CREATE OR REPLACE FUNCTION DECRIPTARE_UTILIZ_ADM(
+    username_utiliz VARCHAR2
+) RETURN NUMBER IS
+    cnp_ul RAW(128);
+    cheie_actuala RAW(128);
+    mod_operare PLS_INTEGER := DBMS_CRYPTO.ENCRYPT_AES128 + 
+                          DBMS_CRYPTO.PAD_PKCS5 + 
+                          DBMS_CRYPTO.CHAIN_CBC;
+BEGIN
+
+    SELECT CNP INTO cnp_ul
+    FROM UTILIZATOR
+    WHERE username = username_utiliz;
+    
+    SELECT cheie_val INTO cheie_actuala 
+    FROM CHEIE_CRIPT_DECR 
+    WHERE tabel = 'UTILIZATOR';
+
+
+    RETURN TO_NUMBER(UTL_I18N.RAW_TO_CHAR( 
+        DBMS_CRYPTO.decrypt(
+            cnp_ul,
+            mod_operare,
+            cheie_actuala
+         ),
+     'AL32UTF8'));
+END;
+/
+
+INSERT INTO UTILIZATOR 
+VALUES (1,CRIPTARE_UTILIZ_ADM('1850223145522'),'BRAN','IONEL','FRNMP_ANTRENOR1', 'ANTRENOR',NULL,1);
+
+INSERT INTO UTILIZATOR 
+VALUES (2,CRIPTARE_UTILIZ_ADM('2960225640002'),'STAN','DENISA','FRNMP_ANTRENOR2', 'ANTRENOR',1,1);
+
+INSERT INTO UTILIZATOR 
+VALUES (3,CRIPTARE_UTILIZ_ADM('2951230111012'),'TANCI','MARIA','FRNMP_ANTRENOR3', 'ANTRENOR',1,2);
+
+INSERT INTO UTILIZATOR 
+VALUES (4,CRIPTARE_UTILIZ_ADM('1630823578936'),'GRIGORAS','MARIN','FRNMP_ANTRENOR4', 'ANTRENOR',2,3);
+
+SELECT * FROM UTILIZATOR;
+
+SELECT DECRIPTARE_UTILIZ_ADM('FRNMP_ANTRENOR1') FROM DUAL;
+INSERT INTO ANTRENOR VALUES(1,20);
+INSERT INTO ANTRENOR VALUES(2,9);
+INSERT INTO ANTRENOR VALUES(3,5);
+INSERT INTO ANTRENOR VALUES(4,12);
+
+SELECT * FROM ANTRENOR;
+select * from UTILIZATOR ;
+INSERT INTO UTILIZATOR 
+VALUES (5,CRIPTARE_UTILIZ_ADM('7050821555520'),'DRAGU','STELIAN','FRNMP_APP_SPORTIV1', 'SPORTIV',1,1);
+
+INSERT INTO UTILIZATOR 
+VALUES (6,CRIPTARE_UTILIZ_ADM('6050426785520'),'MICU','DENISA','FRNMP_APP_SPORTIV2', 'SPORTIV',2,1);
+
+INSERT INTO UTILIZATOR 
+VALUES (7,CRIPTARE_UTILIZ_ADM('6001230121030'),'MARCU','MARIA','FRNMP_APP_SPORTIV3', 'SPORTIV',3,2);
+
+INSERT INTO UTILIZATOR 
+VALUES (8,CRIPTARE_UTILIZ_ADM('7110325871101'),'STAN','FILIP','FRNMP_APP_SPORTIV4', 'SPORTIV',4,3);
+
+INSERT INTO UTILIZATOR 
+VALUES (9,CRIPTARE_UTILIZ_ADM('7111015775232'),'MISTI','SAR','FRNMP_APP_SPORTIV5', 'SPORTIV',1,1);
+
+select * from categorie;
+INSERT INTO SPORTIV
+VALUES (5,1,TO_DATE('21-08-2005','DD-MM-YYYY'),'M');
+
+UPDATE SPORTIV
+SET cod_categorie = 2
+WHERE cod_sportiv = 5;
+
+insert INTO SPORTIV
+VALUES (6,2,TO_DATE('26-04-2005','DD-MM-YYYY'),'F');
+
+UPDATE SPORTIV
+SET cod_categorie = 1
+WHERE cod_sportiv = 6;
+
+INSERT INTO SPORTIV
+VALUES (7,3,TO_DATE('30-12-2000','DD-MM-YYYY'),'F');
+
+UPDATE SPORTIV
+SET cod_categorie = 1
+WHERE cod_sportiv = 7;
+
+INSERT INTO SPORTIV
+VALUES (8,4,TO_DATE('25-03-2011','DD-MM-YYYY'),'M');
+
+UPDATE SPORTIV
+SET cod_categorie = 8
+WHERE cod_sportiv = 8;
+
+INSERT INTO SPORTIV
+VALUES (9,5,TO_DATE('15-10-2011','DD-MM-YYYY'),'M');
+
+UPDATE SPORTIV
+SET cod_categorie = 8
+WHERE cod_sportiv = 9;
+
+commit;
+
+SELECT * FROM SPORTIV;

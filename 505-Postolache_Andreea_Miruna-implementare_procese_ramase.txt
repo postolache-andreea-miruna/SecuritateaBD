@@ -1,0 +1,1052 @@
+--implementarea celorlalte procese (P6-12,17)
+
+--administrator
+
+---
+--O ALTA REZOLVARE PENTRU P6: PROCEDURA CREATA IN ADMIN 
+/*
+Vizualizarea rezultatelor per categorie a tuturor sportivilor pentru o competiție și o 
+probă aleasă, incluzându-se numele clubului și al antrenorului
+*/
+-- 
+CREATE OR REPLACE PROCEDURE vizualizare_rezultate_per_categorie (
+    p_competitie IN VARCHAR2,
+    p_proba IN VARCHAR2
+)
+IS
+    CURSOR categorie_cursor IS
+        SELECT DISTINCT ca.nume AS categorie
+        FROM frnmp_app_admin.istoric i
+        JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+        JOIN frnmp_app_admin.categorie ca ON s.cod_categorie = ca.cod_categorie
+        WHERE i.cod_competitie = (
+                SELECT cod_competitie 
+                FROM frnmp_app_admin.competitie 
+                WHERE nume = p_competitie
+            )
+          AND i.cod_proba = (
+                SELECT cod_proba 
+                FROM frnmp_app_admin.proba 
+                WHERE nume = p_proba
+            );
+
+    CURSOR rezultat_cursor(p_categorie VARCHAR2) IS
+        SELECT 
+            u.nume || ' ' || u.prenume AS sportiv,
+            c.nume AS club,
+            u2.nume || ' ' || u2.prenume AS antrenor,
+            i.loc_per_categorie
+        FROM 
+            frnmp_app_admin.istoric i
+            JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+            JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+            JOIN frnmp_app_admin.antrenor a ON u.cod_antrenor = a.cod_antrenor
+            JOIN frnmp_app_admin.utilizator u2 ON a.cod_antrenor = u2.cod_utilizator
+            JOIN frnmp_app_admin.club c ON u.cod_club = c.cod_club
+        WHERE 
+            s.cod_categorie = (
+                SELECT cod_categorie 
+                FROM frnmp_app_admin.categorie 
+                WHERE nume = p_categorie
+            )
+          AND i.cod_competitie = (
+                SELECT cod_competitie 
+                FROM frnmp_app_admin.competitie 
+                WHERE nume = p_competitie
+            )
+          AND i.cod_proba = (
+                SELECT cod_proba 
+                FROM frnmp_app_admin.proba 
+                WHERE nume = p_proba
+            )
+        ORDER BY i.loc_per_categorie;
+
+    v_categorie VARCHAR2(50);
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Rezultatele pentru competitia: ' || p_competitie ||' la proba: ' || p_proba);
+    DBMS_OUTPUT.PUT_LINE('');
+    FOR categorie_rec IN categorie_cursor LOOP
+        v_categorie := categorie_rec.categorie;
+
+        DBMS_OUTPUT.PUT_LINE('Categoria: ' || v_categorie);
+        DBMS_OUTPUT.PUT_LINE('------------------------');
+
+        FOR rezultat_rec IN rezultat_cursor(v_categorie) LOOP
+            DBMS_OUTPUT.PUT_LINE('Loc: ' || rezultat_rec.loc_per_categorie ||', Sportiv: ' || rezultat_rec.sportiv || ', Club: ' || rezultat_rec.club || ', Antrenor: ' || rezultat_rec.antrenor );
+        END LOOP;
+        
+        DBMS_OUTPUT.PUT_LINE('');
+    END LOOP;
+END;
+/
+
+--O ALTA METODA PENTRU P7
+/*
+: Vizualizarea rezultatelor per gen a tuturor sportivilor pentru competiția și proba și a 
+se afla care sunt cei mai buni 3 sportivi și cele mai bune 3 sportive ale competiției (având 
+în vedere numărul total de puncte obținute în cadrul competiției), cu menționarea clubului 
+de apartenență. 
+*/
+CREATE OR REPLACE PROCEDURE vizualizare_rezultate_per_gen__si_total_puncte (
+    v_competitie IN VARCHAR2,
+    v_proba IN VARCHAR2
+)
+IS
+    CURSOR gen_cursor IS
+        SELECT DISTINCT s.gen AS gen
+        FROM frnmp_app_admin.istoric i
+        JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+        WHERE i.cod_competitie = (
+                SELECT cod_competitie 
+                FROM frnmp_app_admin.competitie 
+                WHERE nume = v_competitie
+            )
+          AND i.cod_proba = (
+                SELECT cod_proba 
+                FROM frnmp_app_admin.proba 
+                WHERE nume = v_proba
+            );
+
+    CURSOR rezultat_cursor(p_gen VARCHAR2) IS
+        SELECT 
+            u.nume || ' ' || u.prenume AS sportiv,
+            c.nume AS club,
+            i.loc_per_categorie,
+            i.loc_per_gen,
+            ca.nume
+        FROM 
+            frnmp_app_admin.istoric i
+            JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+            JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+            JOIN frnmp_app_admin.club c ON u.cod_club = c.cod_club
+            JOIN frnmp_app_admin.categorie ca ON s.cod_categorie = ca.cod_categorie
+        WHERE 
+            s.gen = p_gen
+        
+           AND i.cod_competitie = (
+                SELECT cod_competitie 
+                FROM frnmp_app_admin.competitie 
+                WHERE nume = v_competitie
+            )
+          AND i.cod_proba = (
+                SELECT cod_proba 
+                FROM frnmp_app_admin.proba 
+                WHERE nume = v_proba
+            )
+        ORDER BY i.loc_per_gen;
+        
+        
+         
+        CURSOR podium_puncte_cursor(p_gen VARCHAR2) IS
+        SELECT *
+        FROM(
+            SELECT 
+                ROW_NUMBER() OVER (ORDER BY SUM(i.puncte) DESC) AS podium_loc,
+                u.nume || ' ' || u.prenume AS sportiv,
+                c.nume AS club,
+                sum(i.PUNCTE) as punctaj
+            FROM 
+                frnmp_app_admin.istoric i
+                JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+                JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+                JOIN frnmp_app_admin.club c ON u.cod_club = c.cod_club
+            WHERE 
+                s.gen = p_gen
+               AND i.cod_competitie = (
+                    SELECT cod_competitie 
+                    FROM frnmp_app_admin.competitie 
+                    WHERE nume = v_competitie
+                )
+            group by u.nume,u.prenume,c.nume
+            ORDER BY sum(i.PUNCTE) desc
+        )
+        WHERE podium_loc <=3;
+
+    v_gen VARCHAR2(1);
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Rezultatele per gen pentru competitia: ' || v_competitie ||' la proba: ' || v_proba);
+    DBMS_OUTPUT.PUT_LINE('');
+    FOR gen_rec IN gen_cursor LOOP
+        v_gen := gen_rec.gen;
+
+        DBMS_OUTPUT.PUT_LINE('Gen: ' || v_gen);
+        DBMS_OUTPUT.PUT_LINE('------------------------');
+
+        DBMS_OUTPUT.PUT_LINE('Top 3 sportivi per gen in functie de numarul total de puncte obtinute in total la aceasta competitie');
+        
+        FOR rezultat_rec IN podium_puncte_cursor(v_gen) LOOP
+            DBMS_OUTPUT.PUT_LINE(rezultat_rec.podium_loc||': punctaj total: ' || rezultat_rec.punctaj ||', Sportiv: ' || rezultat_rec.sportiv ||', Club: ' || rezultat_rec.club);
+        END LOOP;
+        
+        DBMS_OUTPUT.PUT_LINE('------------------------');
+        DBMS_OUTPUT.PUT_LINE('Clasamentul pe general pentru proba si competitia aleasa');
+        FOR rezultat_rec IN rezultat_cursor(v_gen) LOOP
+            DBMS_OUTPUT.PUT_LINE('Loc general: ' || rezultat_rec.loc_per_gen ||', Sportiv: ' || rezultat_rec.sportiv || ', Loc categ: ' || rezultat_rec.loc_per_categorie ||', Club: ' || rezultat_rec.club);
+        END LOOP;
+
+        DBMS_OUTPUT.PUT_LINE('');
+    END LOOP;
+END;
+/
+
+--P8
+/*
+Pentru un sportiv ales să se vizualizeze cel mai bun timp pentru toate probele la care 
+a participat de-a lungul timpului, alături de date obținerii. 
+*/
+CREATE OR REPLACE PROCEDURE get_best_times_for_sportiv(
+    p_nume_sp IN VARCHAR2, 
+    p_prenume_sp IN VARCHAR2 
+) AS
+    v_cod_sp NUMBER; 
+    CURSOR best_of(p_cod_sp NUMBER) IS
+        SELECT 
+            p.nume AS proba,
+            i.timp_total AS timp,
+            TO_CHAR(c.data_start, 'DD-MM-YYYY') AS dataS,
+            TO_CHAR(c.data_final, 'DD-MM-YYYY') AS dataF
+        FROM 
+            frnmp_app_admin.istoric i
+            join frnmp_app_admin.competitie c on i.cod_competitie = c.cod_competitie
+            join frnmp_app_admin.proba p on i.cod_proba = p.cod_proba
+        WHERE 
+            i.cod_sportiv = p_cod_sp
+        AND i.timp_total= ( 
+            SELECT MIN(i2.timp_total)
+            FROM frnmp_app_admin.istoric i2
+            WHERE i2.cod_proba = i.cod_proba
+            AND i2.cod_sportiv = i.cod_sportiv
+        )
+        ORDER BY p.nume;   
+BEGIN
+    IF (REGEXP_LIKE(p_nume_sp, '^[A-Za-z]+$') AND REGEXP_LIKE(p_prenume_sp, '^[A-Za-z]+$')) THEN
+        SELECT s.cod_sportiv
+        INTO v_cod_sp
+        FROM frnmp_app_admin.sportiv s
+        JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+        WHERE u.nume = p_nume_sp
+        AND u.prenume = p_prenume_sp;
+
+        IF v_cod_sp IS NOT NULL THEN
+            DBMS_OUTPUT.PUT_LINE('BEST OF TIME PENTRU sportivul: ' || p_nume_sp || ' ' || p_prenume_sp);
+            DBMS_OUTPUT.PUT_LINE('----------------------------------------------------------');
+
+            FOR rec IN best_of(v_cod_sp) LOOP
+                DBMS_OUTPUT.PUT_LINE(rec.proba || ' - ' || rec.timp || ' s, in perioada competitiei: ' || rec.dataS || ' - ' || rec.dataF);
+            END LOOP;
+
+            DBMS_OUTPUT.PUT_LINE('----------------------------------------------------------');
+        ELSE
+            RAISE_APPLICATION_ERROR(-20032, 'Error');
+        END IF;
+        
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('Numele sau prenumele contine caractere invalide!');
+    END IF;
+EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20031, 'ERROR');
+        WHEN OTHERS THEN
+            RAISE_APPLICATION_ERROR(-20033, 'Error');
+END;
+/
+
+
+--P9
+/*
+Pentru un sportiv ales să se observe evoluția per probe de la toate competițiile la care 
+a participat și să se vadă perioadele evoluției și fluctuația acesteia (cum crește/descrește). 
+*/
+CREATE OR REPLACE PROCEDURE evolutie_sportiv(
+    p_nume_sp IN VARCHAR2,
+    p_prenume_sp IN VARCHAR2
+)
+IS 
+    v_cod_sp NUMBER;
+    TYPE timp_tab IS TABLE OF NUMBER INDEX BY PLS_INTEGER;
+    v_timpi timp_tab;
+
+    CURSOR probe_cursor IS
+        SELECT DISTINCT p.nume AS proba
+        FROM frnmp_app_admin.istoric i
+        JOIN frnmp_app_admin.proba p on i.cod_proba = p.cod_proba
+        WHERE i.cod_sportiv = v_cod_sp;
+    
+    CURSOR istoric_cursor_sp(p_proba VARCHAR2,p_cod_sp NUMBER) IS
+        SELECT 
+            i.timp_total AS timp,
+            TO_CHAR(c.data_start, 'DD-MM-YYYY') AS dataS,
+            TO_CHAR(c.data_final, 'DD-MM-YYYY') AS dataF
+        FROM 
+            frnmp_app_admin.istoric i
+            join frnmp_app_admin.competitie c on i.cod_competitie = c.cod_competitie
+            join frnmp_app_admin.proba p on i.cod_proba = p.cod_proba
+        WHERE 
+            i.cod_sportiv = p_cod_sp
+        AND UPPER(p.nume) = UPPER(p_proba)
+        order by c.data_start;
+
+     v_proba VARCHAR2(30);
+     v_index PLS_INTEGER;
+BEGIN
+    IF (REGEXP_LIKE(p_nume_sp, '^[A-Za-z]+$') AND REGEXP_LIKE(p_prenume_sp, '^[A-Za-z]+$')) THEN
+        SELECT s.cod_sportiv
+        INTO v_cod_sp
+        FROM frnmp_app_admin.sportiv s
+        JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+        WHERE upper(u.nume) = upper(p_nume_sp)
+        AND upper(u.prenume) = upper(p_prenume_sp);
+    
+        IF v_cod_sp IS NOT NULL THEN
+            DBMS_OUTPUT.PUT_LINE('Evolutia sportivului: ' || p_nume_sp || ' ' || p_prenume_sp);
+            DBMS_OUTPUT.PUT_LINE('----------------------------------------------------------');
+            
+            FOR proba_rec IN probe_cursor LOOP
+                v_proba := proba_rec.proba;
+                DBMS_OUTPUT.PUT_LINE('Evolutia in proba: '|| v_proba);
+                v_timpi.DELETE;
+                v_index := 0;
+                FOR rec IN istoric_cursor_sp(v_proba,v_cod_sp) LOOP
+                    DBMS_OUTPUT.PUT_LINE(rec.timp || ' s, in perioada competitiei: ' || rec.dataS ||' - ' ||rec.dataF);
+                    v_index := v_index + 1;
+                    v_timpi(v_index) := rec.timp;
+                END LOOP;
+                DBMS_OUTPUT.PUT_LINE(' ');
+                DBMS_OUTPUT.PUT_LINE('Fluctuatia evolutiei');
+                IF v_timpi.COUNT = 1 THEN
+                    DBMS_OUTPUT.PUT_LINE(v_timpi(1));
+                END IF;
+                IF v_timpi.COUNT > 1 THEN
+                    FOR i IN 1..v_timpi.COUNT LOOP
+                        DBMS_OUTPUT.PUT(v_timpi(i));
+                        IF i < v_timpi.COUNT THEN
+                            IF v_timpi(i + 1) < v_timpi(i) THEN
+                                DBMS_OUTPUT.PUT(' \ '); --TIMPUL ESTE IMBUNATATIT FATA DE CONCURSUL ANTERIOR
+                            ELSE
+                                DBMS_OUTPUT.PUT(' / '); -- A SCOS UN TIMP MAI MARE DECAT IN CONCURSUL ANTERIOR
+                            END IF;
+                        END IF;
+                    END LOOP;
+                END IF;
+                DBMS_OUTPUT.PUT_LINE(' ');
+                DBMS_OUTPUT.PUT_LINE('----------------------------------------------------------');
+            END LOOP;
+        ELSE
+            RAISE_APPLICATION_ERROR(-20032, 'Error');
+        END IF;
+     ELSE
+        DBMS_OUTPUT.PUT_LINE('Numele sau prenumele contin caractere invalide!');
+    END IF;
+EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20031, 'ERROR');
+END;
+/
+
+--p10
+--Vizualizarea top 3 cluburi pentru o competi?ie aleas? în func?ie de num?rul de medalii ob?inute la categorie
+SET SERVEROUTPUT ON;
+CREATE OR REPLACE PROCEDURE top_cluburi(
+    p_nume_comp IN VARCHAR2)
+IS
+    v_cod_comp NUMBER;
+    
+    CURSOR medalii_club_cursor(p_cod_comp NUMBER) IS
+        SELECT *
+        FROM(
+            SELECT 
+                ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) AS podium_loc,
+                c.nume AS club,
+                COUNT(*) AS nr_locuri_podium_categ
+            FROM frnmp_app_admin.istoric i
+            JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+            JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+            JOIN frnmp_app_admin.club c ON u.cod_club = c.cod_club
+            WHERE i.cod_competitie = p_cod_comp
+              AND i.loc_per_categorie IN (1, 2, 3) -- Se iau doar locurile 1, 2 sau 3
+            GROUP BY c.nume
+            ORDER BY COUNT(*) DESC)
+        WHERE podium_loc <=3;
+BEGIN
+    SELECT cod_competitie
+    INTO v_cod_comp
+    FROM frnmp_app_admin.competitie
+    WHERE UPPER(nume) = UPPER(p_nume_comp);
+    
+    IF v_cod_comp IS NOT NULL THEN  
+        DBMS_OUTPUT.PUT_LINE('Top 3 cluburi pentru competitia '|| p_nume_comp);
+        DBMS_OUTPUT.PUT_LINE('----------------------------------------------------------');
+        
+        FOR rec IN medalii_club_cursor(v_cod_comp) LOOP
+            DBMS_OUTPUT.PUT_LINE('LOC '||rec.podium_loc ||  ' ' || rec.club  || ' cu ' ||rec.nr_locuri_podium_categ|| ' medalii');
+        END LOOP;
+    ELSE
+        RAISE_APPLICATION_ERROR(-20032, 'Error');
+    END IF;
+
+EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20031, 'ERROR');
+END;
+/
+
+
+
+--P11
+--Vizualizarea top 3 sportivi pentru anul, clubul ?i proba aleas? 
+SET SERVEROUTPUT ON;
+/
+CREATE OR REPLACE PROCEDURE top_sportivi_an_cl_proba(
+    p_nume_club IN VARCHAR2,
+    p_nume_proba IN VARCHAR2,
+    p_an IN NUMBER
+    )
+IS
+    v_cod_club NUMBER;
+    v_cod_proba NUMBER;
+    
+    CURSOR top_sportivi_cursor(p_cod_club NUMBER, p_cod_proba NUMBER, p_an NUMBER) IS
+        SELECT *
+        FROM(
+            SELECT 
+                ROW_NUMBER() OVER (ORDER BY SUM(i.puncte) DESC) AS podium_loc,
+                u.nume ||' '||u.prenume as sportiv,
+                SUM(i.puncte) AS total_puncte
+            FROM frnmp_app_admin.istoric i
+            JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+            JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+            JOIN frnmp_app_admin.club c ON u.cod_club = c.cod_club
+            JOIN frnmp_app_admin.proba p ON i.cod_proba = p.cod_proba
+            JOIN frnmp_app_admin.competitie co ON i.cod_competitie = co.cod_competitie
+            WHERE c.cod_club = p_cod_club
+              AND p.cod_proba = p_cod_proba
+              AND EXTRACT(YEAR FROM co.data_start) = p_an
+            GROUP BY u.nume,u.prenume
+            ORDER BY SUM(i.puncte) DESC)
+        WHERE podium_loc <=3;
+BEGIN
+    SELECT cod_club
+    INTO v_cod_club
+    FROM frnmp_app_admin.club
+    WHERE UPPER(nume) = UPPER(p_nume_club);
+    
+    SELECT cod_proba
+    INTO v_cod_proba
+    FROM frnmp_app_admin.proba
+    WHERE UPPER(nume) = UPPER(p_nume_proba);
+
+    IF v_cod_club IS NOT NULL and v_cod_proba IS NOT NULL THEN
+        DBMS_OUTPUT.PUT_LINE('Top 3 SPORTIVI pentru clubul '|| p_nume_club ||' cu participari la proba: ' || p_nume_proba ||' in anul ' || to_char(p_an));
+        DBMS_OUTPUT.PUT_LINE('----------------------------------------------------------');
+        
+        FOR rec IN top_sportivi_cursor(v_cod_club,v_cod_proba,p_an) LOOP
+            DBMS_OUTPUT.PUT_LINE('LOC '||rec.podium_loc ||  ' ' || rec.sportiv  || ' cu ' ||rec.total_puncte|| ' puncte');
+        END LOOP;
+    ELSE
+        RAISE_APPLICATION_ERROR(-20032, 'Error');
+    END IF;
+
+EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20031, 'ERROR');
+        WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20033, 'Error');
+END;
+/
+
+
+
+--rulate de diferiti utilizatori care au acces la acestea
+--a treia metoda de vizualizare p6
+SET SERVEROUTPUT ON;
+EXEC frnmp_app_admin.vizualizare_rezultate_per_categorie('CUPA DE TOAMNA 2024', '50 LIBER');
+
+--p7
+EXEC frnmp_app_admin.vizualizare_rezultate_per_gen__si_total_puncte('CUPA DE TOAMNA 2024', '50 LIBER');
+EXEC frnmp_app_admin.vizualizare_rezultate_per_gen__si_total_puncte('CUPA DE TOAMNA 2024', '100 LIBER');
+
+--P8 pentru restul de sportivi (3,4,5), antrenori, public si reprezentant companie
+EXEC frnmp_app_admin.get_best_times_for_sportiv('DRAGU', 'STELIAN');
+--Numele sau prenumele contine caractere invalide!
+EXEC frnmp_app_admin.get_best_times_for_sportiv('DRAGU4', 'STELIAN');
+
+--p9
+EXEC frnmp_app_admin.evolutie_sportiv('DRAGU', 'STELIAN');
+EXEC frnmp_app_admin.get_best_times_for_sportiv('DRAGU4', 'STELIAN');
+
+--p10
+EXEC frnmp_app_admin.top_cluburi('CUPA DE TOAMNA 2024');
+
+--P11
+EXEC frnmp_app_admin.top_sportivi_an_cl_proba('aqua team','50 liber',2024);
+
+--rulat ca frnmp_sportiv1, frnmp_sportiv2
+select * from istoric;
+select * from proba;
+SELECT * FROM COMPETITIE;
+--implementare P6: Vizualizarea rezultatelor per categorie a tuturor sportivilor pentru o competi?ie ?i o prob? aleas? ?i a câ?tig?torilor, incluzându-se numele clubului ?i al antrenorului
+
+--CEREREA DE PREGATIRE
+--select u.nume ||' '|| u.prenume sportiv, c.nume club, u2.nume ||' '|| u2.prenume antrenor, ca.nume categorie, loc_per_categorie
+--from frnmp_app_admin.istoric i
+--join frnmp_app_admin.sportiv s on i.cod_sportiv = s.cod_sportiv
+--join frnmp_app_admin.utilizator u on s.cod_sportiv = u.cod_utilizator
+--join frnmp_app_admin.antrenor a on u.cod_antrenor = a.cod_antrenor
+--join frnmp_app_admin.utilizator u2 on a.cod_antrenor = u2.cod_utilizator
+--join frnmp_app_admin.club c on u.cod_club = c.cod_club
+--join frnmp_app_admin.categorie ca on s.cod_categorie = ca.cod_categorie
+--where i.cod_competitie = (select cod_competitie
+--                        from frnmp_app_admin.competitie
+--                        where nume = 'CUPA DE TOAMNA 2024')
+--    and i.cod_proba = (select cod_proba
+--                    from frnmp_app_admin.proba
+--                    where nume = '50 LIBER')
+--order by s.cod_categorie, i.loc_per_categorie;
+SET SERVEROUTPUT ON;
+--in acest mod este folosit rolul vizualizari_rezultate
+DECLARE
+    v_competitie VARCHAR2(100) := '&v_competitie'; -- CUPA DE TOAMNA 2024
+    v_proba VARCHAR2(100) := '&v_proba'; -- 50 LIBER
+    CURSOR categorie_cursor IS
+        SELECT DISTINCT ca.nume AS categorie
+        FROM frnmp_app_admin.istoric i
+        JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+        JOIN frnmp_app_admin.categorie ca ON s.cod_categorie = ca.cod_categorie
+        WHERE i.cod_competitie = (
+                SELECT cod_competitie 
+                FROM frnmp_app_admin.competitie 
+                WHERE nume = v_competitie
+            )
+          AND i.cod_proba = (
+                SELECT cod_proba 
+                FROM frnmp_app_admin.proba 
+                WHERE nume = v_proba
+            );
+
+    CURSOR rezultat_cursor(p_categorie VARCHAR2) IS
+        SELECT 
+            u.nume || ' ' || u.prenume AS sportiv,
+            c.nume AS club,
+            u2.nume || ' ' || u2.prenume AS antrenor,
+            i.loc_per_categorie
+        FROM 
+            frnmp_app_admin.istoric i
+            JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+            JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+            JOIN frnmp_app_admin.antrenor a ON u.cod_antrenor = a.cod_antrenor
+            JOIN frnmp_app_admin.utilizator u2 ON a.cod_antrenor = u2.cod_utilizator
+            JOIN frnmp_app_admin.club c ON u.cod_club = c.cod_club
+        WHERE 
+            s.cod_categorie = (
+                SELECT cod_categorie 
+                FROM frnmp_app_admin.categorie 
+                WHERE nume = p_categorie
+            )
+          AND i.cod_competitie = (
+                SELECT cod_competitie 
+                FROM frnmp_app_admin.competitie 
+                WHERE nume = v_competitie
+            )
+          AND i.cod_proba = (
+                SELECT cod_proba 
+                FROM frnmp_app_admin.proba 
+                WHERE nume = v_proba
+            )
+        ORDER BY i.loc_per_categorie;
+
+    v_categorie VARCHAR2(50);
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Rezultatele pentru competitia: ' || v_competitie ||' la proba: ' || v_proba);
+    DBMS_OUTPUT.PUT_LINE('');
+    FOR categorie_rec IN categorie_cursor LOOP
+        v_categorie := categorie_rec.categorie;
+
+        DBMS_OUTPUT.PUT_LINE('Categoria: ' || v_categorie);
+        DBMS_OUTPUT.PUT_LINE('------------------------');
+
+        FOR rezultat_rec IN rezultat_cursor(v_categorie) LOOP
+            DBMS_OUTPUT.PUT_LINE('Loc: ' || rezultat_rec.loc_per_categorie ||', Sportiv: ' || rezultat_rec.sportiv || ', Club: ' || rezultat_rec.club || ', Antrenor: ' || rezultat_rec.antrenor );
+        END LOOP;
+
+        DBMS_OUTPUT.PUT_LINE('');
+    END LOOP;
+END;
+/
+
+
+SET SERVEROUTPUT ON;
+--p7
+--Vizualizarea rezultatelor per gen a tuturor sportivilor pentru competi?ia aleas?
+--si vizualizarea celor mai buni 3 sportivi ?i celor mai bune 3 sportive ale competi?iei 
+--(având în vedere num?rul total de puncte ob?inute în cadrul competi?iei), cu men?ionarea clubului de apartenen??.
+DECLARE
+    v_competitie VARCHAR2(100) := '&v_competitie'; -- CUPA DE TOAMNA 2024
+    v_proba VARCHAR2(100) := '&v_proba'; -- 50 LIBER
+    CURSOR gen_cursor IS
+        SELECT DISTINCT s.gen AS gen
+        FROM frnmp_app_admin.istoric i
+        JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+        WHERE i.cod_competitie = (
+                SELECT cod_competitie 
+                FROM frnmp_app_admin.competitie 
+                WHERE nume = v_competitie
+            )
+          AND i.cod_proba = (
+                SELECT cod_proba 
+                FROM frnmp_app_admin.proba 
+                WHERE nume = v_proba
+            );
+
+    CURSOR rezultat_cursor(p_gen VARCHAR2) IS
+        SELECT 
+            u.nume || ' ' || u.prenume AS sportiv,
+            c.nume AS club,
+            i.loc_per_categorie,
+            i.loc_per_gen,
+            ca.nume
+        FROM 
+            frnmp_app_admin.istoric i
+            JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+            JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+            JOIN frnmp_app_admin.club c ON u.cod_club = c.cod_club
+            JOIN frnmp_app_admin.categorie ca ON s.cod_categorie = ca.cod_categorie
+        WHERE 
+            s.gen = p_gen
+        
+           AND i.cod_competitie = (
+                SELECT cod_competitie 
+                FROM frnmp_app_admin.competitie 
+                WHERE nume = v_competitie
+            )
+          AND i.cod_proba = (
+                SELECT cod_proba 
+                FROM frnmp_app_admin.proba 
+                WHERE nume = v_proba
+            )
+        ORDER BY i.loc_per_gen;
+        
+        
+         
+        CURSOR podium_puncte_cursor(p_gen VARCHAR2) IS
+        SELECT *
+        FROM(
+            SELECT 
+                ROW_NUMBER() OVER (ORDER BY SUM(i.puncte) DESC) AS podium_loc,
+                u.nume || ' ' || u.prenume AS sportiv,
+                c.nume AS club,
+                sum(i.PUNCTE) as punctaj
+            FROM 
+                frnmp_app_admin.istoric i
+                JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+                JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+                JOIN frnmp_app_admin.club c ON u.cod_club = c.cod_club
+            WHERE 
+                s.gen = p_gen
+               AND i.cod_competitie = (
+                    SELECT cod_competitie 
+                    FROM frnmp_app_admin.competitie 
+                    WHERE nume = v_competitie
+                )
+            group by u.nume,u.prenume,c.nume
+            ORDER BY sum(i.PUNCTE) desc
+        )
+        WHERE podium_loc <=3;
+
+    v_gen VARCHAR2(1);
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Rezultatele per gen pentru competitia: ' || v_competitie ||' la proba: ' || v_proba);
+    DBMS_OUTPUT.PUT_LINE('');
+    FOR gen_rec IN gen_cursor LOOP
+        v_gen := gen_rec.gen;
+
+        DBMS_OUTPUT.PUT_LINE('Gen: ' || v_gen);
+        DBMS_OUTPUT.PUT_LINE('------------------------');
+
+        DBMS_OUTPUT.PUT_LINE('Top 3 sportivi per gen in functie de numarul total de puncte obtinute in total la aceasta competitie');
+        
+        FOR rezultat_rec IN podium_puncte_cursor(v_gen) LOOP
+            DBMS_OUTPUT.PUT_LINE(rezultat_rec.podium_loc||': punctaj total: ' || rezultat_rec.punctaj ||', Sportiv: ' || rezultat_rec.sportiv ||', Club: ' || rezultat_rec.club);
+        END LOOP;
+        
+        DBMS_OUTPUT.PUT_LINE('------------------------');
+        DBMS_OUTPUT.PUT_LINE('Clasamentul pe general pentru proba si competitia aleasa');
+        FOR rezultat_rec IN rezultat_cursor(v_gen) LOOP
+            DBMS_OUTPUT.PUT_LINE('Loc general: ' || rezultat_rec.loc_per_gen ||', Sportiv: ' || rezultat_rec.sportiv || ', Loc categ: ' || rezultat_rec.loc_per_categorie ||', Club: ' || rezultat_rec.club);
+        END LOOP;
+
+        DBMS_OUTPUT.PUT_LINE('');
+    END LOOP;
+END;
+/
+
+
+--p8
+SET SERVEROUTPUT ON;
+--Pentru un sportiv ales s? se vizualizeze cel mai bun timp 
+--pentru toate probele la care a participat de-a lungul timpului, al?turi de data ob?inerii.
+DECLARE
+    v_nume_sp VARCHAR2(20) := '&v_nume_sp'; -- DRAGU
+    v_prenume_sp VARCHAR2(20) := '&v_prenume_sp'; -- STELIAN
+    v_cod_sp NUMBER;
+    
+    CURSOR best_of(p_cod_sp NUMBER) IS
+        SELECT 
+            p.nume AS proba,
+            i.timp_total AS timp,
+            TO_CHAR(c.data_start, 'DD-MM-YYYY') AS dataS,
+            TO_CHAR(c.data_final, 'DD-MM-YYYY') AS dataF
+        FROM 
+            frnmp_app_admin.istoric i
+            join frnmp_app_admin.competitie c on i.cod_competitie = c.cod_competitie
+            join frnmp_app_admin.proba p on i.cod_proba = p.cod_proba
+        WHERE 
+            i.cod_sportiv = p_cod_sp
+        AND i.timp_total= ( 
+            SELECT MIN(i2.timp_total)
+            FROM frnmp_app_admin.istoric i2
+            WHERE i2.cod_proba = i.cod_proba
+            AND i2.cod_sportiv = i.cod_sportiv
+        )
+        ORDER BY p.nume;  
+
+BEGIN
+ IF (REGEXP_LIKE(v_nume_sp, '^[A-Za-z]+$') AND REGEXP_LIKE(v_prenume_sp, '^[A-Za-z]+$')) THEN
+        SELECT s.cod_sportiv
+        INTO v_cod_sp
+        FROM frnmp_app_admin.sportiv s
+        JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+        WHERE upper(u.nume) = upper(v_nume_sp)
+        AND upper(u.prenume) = upper(v_prenume_sp);
+    
+        IF v_cod_sp IS NOT NULL THEN
+            DBMS_OUTPUT.PUT_LINE('BEST OF TIME PENTRU sportivul: ' || v_nume_sp || ' ' || v_prenume_sp);
+            DBMS_OUTPUT.PUT_LINE('----------------------------------------------------------');
+    
+            FOR rec IN best_of(v_cod_sp) LOOP
+                DBMS_OUTPUT.PUT_LINE(rec.proba || ' - ' || rec.timp || ' s, in perioada competitiei: ' || rec.dataS ||' - ' ||rec.dataF);
+            END LOOP;
+            
+            DBMS_OUTPUT.PUT_LINE('----------------------------------------------------------');
+        ELSE
+            RAISE_APPLICATION_ERROR(-20032, 'Error');
+        END IF;
+     ELSE
+        DBMS_OUTPUT.PUT_LINE('Numele sau prenumele contin caractere invalide!');
+    END IF;
+EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20031, 'ERROR');
+END;
+/
+
+--p9
+--Pentru un sportiv ales s? se observe evolu?ia per probe
+--de la toate competi?iile la care a participat ?i s? se vad? perioadele de evolu?ie
+SET SERVEROUTPUT ON;
+
+DECLARE
+    v_nume_sp VARCHAR2(20) := '&v_nume_sp'; -- DRAGU
+    v_prenume_sp VARCHAR2(20) := '&v_prenume_sp'; -- STELIAN
+    v_cod_sp NUMBER;
+    TYPE timp_tab IS TABLE OF NUMBER INDEX BY PLS_INTEGER;
+    v_timpi timp_tab;
+
+    CURSOR probe_cursor IS
+        SELECT DISTINCT p.nume AS proba
+        FROM frnmp_app_admin.istoric i
+        JOIN frnmp_app_admin.proba p on i.cod_proba = p.cod_proba
+        WHERE i.cod_sportiv = v_cod_sp;
+    
+    CURSOR istoric_cursor_sp(p_proba VARCHAR2,p_cod_sp NUMBER) IS
+        SELECT 
+            i.timp_total AS timp,
+            TO_CHAR(c.data_start, 'DD-MM-YYYY') AS dataS,
+            TO_CHAR(c.data_final, 'DD-MM-YYYY') AS dataF
+        FROM 
+            frnmp_app_admin.istoric i
+            join frnmp_app_admin.competitie c on i.cod_competitie = c.cod_competitie
+            join frnmp_app_admin.proba p on i.cod_proba = p.cod_proba
+        WHERE 
+            i.cod_sportiv = p_cod_sp
+        AND UPPER(p.nume) = UPPER(p_proba)
+        order by c.data_start;
+
+     v_proba VARCHAR2(30);
+     v_index PLS_INTEGER;
+BEGIN
+    IF (REGEXP_LIKE(v_nume_sp, '^[A-Za-z]+$') AND REGEXP_LIKE(v_prenume_sp, '^[A-Za-z]+$')) THEN
+        SELECT s.cod_sportiv
+        INTO v_cod_sp
+        FROM frnmp_app_admin.sportiv s
+        JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+        WHERE upper(u.nume) = upper(v_nume_sp)
+        AND upper(u.prenume) = upper(v_prenume_sp);
+    
+        IF v_cod_sp IS NOT NULL THEN
+            DBMS_OUTPUT.PUT_LINE('Evolutia sportivului: ' || v_nume_sp || ' ' || v_prenume_sp);
+            DBMS_OUTPUT.PUT_LINE('----------------------------------------------------------');
+            
+            FOR proba_rec IN probe_cursor LOOP
+                v_proba := proba_rec.proba;
+                DBMS_OUTPUT.PUT_LINE('Evolutia in proba: '|| v_proba);
+                v_timpi.DELETE;
+                v_index := 0;
+                FOR rec IN istoric_cursor_sp(v_proba,v_cod_sp) LOOP
+                    DBMS_OUTPUT.PUT_LINE(rec.timp || ' s, in perioada competitiei: ' || rec.dataS ||' - ' ||rec.dataF);
+                    v_index := v_index + 1;
+                    v_timpi(v_index) := rec.timp;
+                END LOOP;
+                DBMS_OUTPUT.PUT_LINE(' ');
+                DBMS_OUTPUT.PUT_LINE('Fluctuatia evolutiei');
+                IF v_timpi.COUNT = 1 THEN
+                    DBMS_OUTPUT.PUT_LINE(v_timpi(1));
+                END IF;
+                IF v_timpi.COUNT > 1 THEN
+                    FOR i IN 1..v_timpi.COUNT LOOP
+                        DBMS_OUTPUT.PUT(v_timpi(i));
+                        IF i < v_timpi.COUNT THEN
+                            IF v_timpi(i + 1) < v_timpi(i) THEN
+                                DBMS_OUTPUT.PUT(' \ '); --TIMPUL ESTE IMBUNATATIT FATA DE CONCURSUL ANTERIOR
+                            ELSE
+                                DBMS_OUTPUT.PUT(' / '); -- A SCOS UN TIMP MAI MARE DECAT IN CONCURSUL ANTERIOR
+                            END IF;
+                        END IF;
+                    END LOOP;
+                END IF;
+                DBMS_OUTPUT.PUT_LINE(' ');
+                DBMS_OUTPUT.PUT_LINE('----------------------------------------------------------');
+            END LOOP;
+        ELSE
+            RAISE_APPLICATION_ERROR(-20032, 'Error');
+        END IF;
+     ELSE
+        DBMS_OUTPUT.PUT_LINE('Numele sau prenumele contin caractere invalide!');
+    END IF;
+EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20031, 'ERROR');
+END;
+/
+
+--p10
+--Vizualizarea top 3 cluburi pentru o competi?ie aleas? în func?ie de num?rul de medalii ob?inute la categorie
+SET SERVEROUTPUT ON;
+DECLARE
+    v_nume_comp VARCHAR2(30) := '&v_nume_comp'; -- CUPA DE TOAMNA 2024
+    v_cod_comp NUMBER;
+    
+    CURSOR medalii_club_cursor(p_cod_comp NUMBER) IS
+        SELECT *
+        FROM(
+            SELECT 
+                ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) AS podium_loc,
+                c.nume AS club,
+                COUNT(*) AS nr_locuri_podium_categ
+            FROM frnmp_app_admin.istoric i
+            JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+            JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+            JOIN frnmp_app_admin.club c ON u.cod_club = c.cod_club
+            WHERE i.cod_competitie = p_cod_comp
+              AND i.loc_per_categorie IN (1, 2, 3) 
+            GROUP BY c.nume
+            ORDER BY COUNT(*) DESC)
+        WHERE podium_loc <=3;
+BEGIN
+    SELECT cod_competitie
+    INTO v_cod_comp
+    FROM frnmp_app_admin.competitie
+    WHERE UPPER(nume) = UPPER(v_nume_comp);
+    
+    IF v_cod_comp IS NOT NULL THEN
+        DBMS_OUTPUT.PUT_LINE('Top 3 cluburipentru competitia '|| v_nume_comp);
+        DBMS_OUTPUT.PUT_LINE('----------------------------------------------------------');
+        
+        FOR rec IN medalii_club_cursor(v_cod_comp) LOOP
+            DBMS_OUTPUT.PUT_LINE('LOC '||rec.podium_loc ||  ' ' || rec.club  || ' cu ' ||rec.nr_locuri_podium_categ|| ' medalii');
+        END LOOP;
+    ELSE
+        RAISE_APPLICATION_ERROR(-20032, 'Error');
+    END IF;
+
+EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20031, 'ERROR');
+END;
+/
+
+--P11
+--Vizualizarea top 3 sportivi pentru anul, clubul ?i proba aleas? 
+SET SERVEROUTPUT ON;
+DECLARE
+    v_an NUMBER :='&v_an'; --2024
+    v_nume_club VARCHAR2(50) := '&v_nume_club'; -- aqua team / delfinul bucuresti
+    v_nume_proba VARCHAR2(30) := '&v_nume_proba'; -- 50 liber
+    v_cod_club NUMBER;
+    v_cod_proba NUMBER;
+    
+    CURSOR top_sportivi_cursor(p_cod_club NUMBER, p_cod_proba NUMBER) IS
+        SELECT *
+        FROM(
+            SELECT 
+                ROW_NUMBER() OVER (ORDER BY SUM(i.puncte) DESC) AS podium_loc,
+                u.nume ||' '||u.prenume as sportiv,
+                SUM(i.puncte) AS total_puncte
+            FROM frnmp_app_admin.istoric i
+            JOIN frnmp_app_admin.sportiv s ON i.cod_sportiv = s.cod_sportiv
+            JOIN frnmp_app_admin.utilizator u ON s.cod_sportiv = u.cod_utilizator
+            JOIN frnmp_app_admin.club c ON u.cod_club = c.cod_club
+            JOIN frnmp_app_admin.proba p ON i.cod_proba = p.cod_proba
+            JOIN frnmp_app_admin.competitie co ON i.cod_competitie = co.cod_competitie
+            WHERE c.cod_club = p_cod_club
+              AND p.cod_proba = p_cod_proba
+              AND EXTRACT(YEAR FROM co.data_start) = v_an
+            GROUP BY u.nume,u.prenume
+            ORDER BY SUM(i.puncte) DESC)
+        WHERE podium_loc <=3;
+BEGIN
+    SELECT cod_club
+    INTO v_cod_club
+    FROM frnmp_app_admin.club
+    WHERE UPPER(nume) = UPPER(v_nume_club);
+    
+    SELECT cod_proba
+    INTO v_cod_proba
+    FROM frnmp_app_admin.proba
+    WHERE UPPER(nume) = UPPER(v_nume_proba);
+
+    IF v_cod_club IS NOT NULL and v_cod_proba IS NOT NULL THEN
+        DBMS_OUTPUT.PUT_LINE('Top 3 SPORTIVI pentru clubul '|| v_nume_club ||' cu participari la proba: ' || v_nume_proba ||' in anul ' || to_char(v_an));
+        DBMS_OUTPUT.PUT_LINE('----------------------------------------------------------');
+        
+        FOR rec IN top_sportivi_cursor(v_cod_club,v_cod_proba) LOOP
+            DBMS_OUTPUT.PUT_LINE('LOC '||rec.podium_loc ||  ' ' || rec.sportiv  || ' cu ' ||rec.total_puncte|| ' puncte');
+        END LOOP;
+    ELSE
+        RAISE_APPLICATION_ERROR(-20032, 'Error');
+    END IF;
+
+EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20031, 'ERROR');
+END;
+/
+ 
+--rulat ca frnmp_reprezentant1
+--p12
+/*
+Vizualizarea detaliilor sportivilor care nu sunt sponsorizați în data actuală de un 
+sponsor ales și care au participat la competiții europene sau mondiale care s-au desfășurat 
+în București sau în străinătate (dar nu în Japonia) și care au fost în top 16 sportivi pe 
+clasamentul general indiferent de probă. 
+*/
+select * from frnmp_app_admin.tip;
+select * from frnmp_app_admin.istoric;
+select * from frnmp_app_admin.COMPETITIE;
+select * from frnmp_app_admin.oras;
+select * from frnmp_app_admin.TARA;
+select * from frnmp_app_admin.viz_sponsorizare_2;
+
+select DISTINCT(s.cod_sportiv), u.nume||' '||u.prenume as nume, s.numar_legitimatie 
+from frnmp_app_admin.sportiv s
+join frnmp_app_admin.utilizator u on s.cod_sportiv = u.cod_utilizator
+join frnmp_app_admin.istoric i on i.cod_sportiv = s.cod_sportiv
+join frnmp_app_admin.competitie c on i.cod_competitie = c.cod_competitie
+join frnmp_app_admin.tip t on c.cod_tip = t.cod_tip
+join frnmp_app_admin.oras o on c.cod_oras = o.cod_oras
+join frnmp_app_admin.tara ta on o.cod_tara = ta.cod_tara
+LEFT join frnmp_app_admin.viz_sponsorizare_2 sp on s.cod_sportiv = sp.cod_sportiv
+where
+UPPER(t.tip_competitie) IN ('EUROPEAN','MONDIAL') AND
+(o.nume_oras = 'BUCURESTI' OR ta.nume_tara <> 'JAPONIA') AND
+i.loc_per_gen <=16
+
+MINUS
+select DISTINCT(s.cod_sportiv), u.nume||' '||u.prenume as nume,s.numar_legitimatie 
+from frnmp_app_admin.sportiv s
+join frnmp_app_admin.utilizator u on s.cod_sportiv = u.cod_utilizator
+join frnmp_app_admin.istoric i on i.cod_sportiv = s.cod_sportiv
+join frnmp_app_admin.competitie c on i.cod_competitie = c.cod_competitie
+join frnmp_app_admin.tip t on c.cod_tip = t.cod_tip
+join frnmp_app_admin.oras o on c.cod_oras = o.cod_oras
+join frnmp_app_admin.tara ta on o.cod_tara = ta.cod_tara
+RIGHT join frnmp_app_admin.viz_sponsorizare_2 sp on s.cod_sportiv = sp.cod_sportiv
+where
+sp.cod_sponsor = 1 and 
+UPPER(t.tip_competitie) IN ('EUROPEAN','MONDIAL') AND
+(o.nume_oras = 'BUCURESTI' OR ta.nume_tara <> 'JAPONIA') AND
+i.loc_per_gen <=16 AND sp.inceput_colaborare<=trunc(sysdate) and sp.sfarsit_colaborare>=trunc(sysdate); --in acest fel sunt eliminati sportivii care au fost macar vreodata sponsorizati si care nu sunt sunt sponsorizati in ziua actuala
+
+
+--rulat ca frnmp_reprezentant2
+
+--p12
+select DISTINCT(s.cod_sportiv), u.nume||' '||u.prenume as nume, s.numar_legitimatie 
+from frnmp_app_admin.sportiv s
+join frnmp_app_admin.utilizator u on s.cod_sportiv = u.cod_utilizator
+join frnmp_app_admin.istoric i on i.cod_sportiv = s.cod_sportiv
+join frnmp_app_admin.competitie c on i.cod_competitie = c.cod_competitie
+join frnmp_app_admin.tip t on c.cod_tip = t.cod_tip
+join frnmp_app_admin.oras o on c.cod_oras = o.cod_oras
+join frnmp_app_admin.tara ta on o.cod_tara = ta.cod_tara
+LEFT join frnmp_app_admin.viz_sponsorizare_2 sp on s.cod_sportiv = sp.cod_sportiv
+where
+UPPER(t.tip_competitie) IN ('EUROPEAN','MONDIAL') AND
+(o.nume_oras = 'BUCURESTI' OR ta.nume_tara <> 'JAPONIA') AND
+i.loc_per_gen <=16
+
+MINUS
+select DISTINCT(s.cod_sportiv), u.nume||' '||u.prenume as nume,s.numar_legitimatie 
+from frnmp_app_admin.sportiv s
+join frnmp_app_admin.utilizator u on s.cod_sportiv = u.cod_utilizator
+join frnmp_app_admin.istoric i on i.cod_sportiv = s.cod_sportiv
+join frnmp_app_admin.competitie c on i.cod_competitie = c.cod_competitie
+join frnmp_app_admin.tip t on c.cod_tip = t.cod_tip
+join frnmp_app_admin.oras o on c.cod_oras = o.cod_oras
+join frnmp_app_admin.tara ta on o.cod_tara = ta.cod_tara
+RIGHT join frnmp_app_admin.viz_sponsorizare_2 sp on s.cod_sportiv = sp.cod_sportiv
+where
+sp.cod_sponsor = 2 and 
+UPPER(t.tip_competitie) IN ('EUROPEAN','MONDIAL') AND
+(o.nume_oras = 'BUCURESTI' OR ta.nume_tara <> 'JAPONIA') AND
+i.loc_per_gen <=16 AND sp.inceput_colaborare<=trunc(sysdate) and sp.sfarsit_colaborare>=trunc(sysdate); --in acest fel sunt eliminati sportivii care au fost macar vreodata sponsorizati si care nu sunt sunt sponsorizati in ziua actuala
+
+   
+--rulat ca frnmp_antrenor1
+--p17
+/*
+ Pentru un antrenor să se afișeze pentru sportivii săi care au participat la concursuri 
+proba la care a avut cea mai bună evoluție. 
+*/
+select * from frnmp_app_admin.sportiv;
+select * from
+(
+select
+s.cod_sportiv, s.numar_legitimatie, p.nume, sum(i.puncte),
+row_number() over(
+    PARTITION BY s.cod_sportiv 
+    order by sum(i.puncte) DESC) as rank
+from frnmp_app_admin.sportiv s
+JOIN frnmp_app_admin.utilizator u on s.cod_sportiv = u.cod_utilizator
+join frnmp_app_admin.istoric i on s.cod_sportiv = i.cod_sportiv
+join frnmp_app_admin.proba p on i.cod_proba = p.cod_proba
+where cod_antrenor = 1
+group by s.cod_sportiv, numar_legitimatie, p.nume) where rank<2;
+
+--rulat ca frnmp_antrenor2
+--p17
+select * from frnmp_app_admin.sportiv;
+select * from
+(
+select
+s.cod_sportiv, s.numar_legitimatie, p.nume, sum(i.puncte),
+row_number() over(
+    PARTITION BY s.cod_sportiv 
+    order by sum(i.puncte) DESC) as rank
+from frnmp_app_admin.sportiv s
+JOIN frnmp_app_admin.utilizator u on s.cod_sportiv = u.cod_utilizator
+join frnmp_app_admin.istoric i on s.cod_sportiv = i.cod_sportiv
+join frnmp_app_admin.proba p on i.cod_proba = p.cod_proba
+where cod_antrenor = 2
+group by s.cod_sportiv, numar_legitimatie, p.nume) where rank<2;
+
+

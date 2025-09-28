@@ -1,0 +1,119 @@
+--mascarea datelor
+
+--Se doreste mascarea datelor care tin de date precum gdpr: nume, prenume, data nastere, gen,
+--dar si a legitimatiilor sportivilor si a clubului din care fac parte utilizatorii
+-- Astfel s-a mascat
+-- CLUB: cod_club, descriere
+-- UTILIZATOR: nume,prenume,cod_club
+-- sportiv: numar_legitimatie, data de nastere si genul
+--Pentru cod_club se genereaza un numar nou care s? inceapa cu aceeasi cifra cu cel original si s? aiba aceeasi lungime.
+--Pentru descriere, nume, prenume se vor pastra prima si ultima litera, restul fiind înlocuit de caracterul ‘#’. In cazul genului acesta va fi inlocuit de ‘#’.
+--Pentru data de nastere se va pastra doar anul initial, ziua si luna fiind generate random.
+--Pentru numarul de legitimatie se va pastra prima cifra, restul fiind inlocuite cu 0 si s? aiba aceeasi lungime.
+
+--rulat ca admin
+
+create or replace package pachet_mascare is 
+function f_mascare(sir varchar2) return varchar2;  
+function f_mascare(nr number) return number;  
+function f_mascare_legitim(nr number) return number; 
+function f_mascare_data(data date) return date;
+end; 
+/ 
+create or replace package body pachet_mascare is 
+type tip_tabind is table of number index by pls_integer;  
+v_tabind tip_tabind; 
+function f_mascare(sir varchar2) return varchar2 is
+    v_sir varchar2(100);
+    v_lung number;
+begin
+    v_lung := length(sir);
+    if v_lung = 1 then
+      return '#';
+    elsif v_lung = 2 then
+      return substr(sir, 1, 1) || '#';
+    else
+      v_sir := substr(sir, 1, 1) || rpad('#', v_lung - 2, '#') || substr(sir, -1, 1);
+      return v_sir;
+    end if;
+end f_mascare;
+
+
+function f_mascare(nr number) return number is 
+    lung number;  
+    minnou number;  
+    maxnou number; 
+    l_seed VARCHAR2(100);  
+    v_nrnou number; 
+begin 
+    if v_tabind.exists(nr) then 
+        return v_tabind(nr); --va fi folosit cand mascam cheia externa 
+    else --generam un numar random care sa inceapa cu aceeasi cifra ca nr si sa aiba aceeasi lungime 
+        lung:=length(to_char(nr));  
+        dbms_output.put_line('lung='||lung); 
+        minnou:=to_number(rpad(substr(to_char(nr),1,1),lung,'0')); 
+        maxnou:=to_number(rpad(substr(to_char(nr),1,1),lung,'9')); 
+        dbms_output.put_line('minnou='||minnou||' maxnou=' ||maxnou); 
+        l_seed:=TO_CHAR(SYSTIMESTAMP,'YYYYDDMMHH24MISSFFFF'); 
+        DBMS_RANDOM.seed (val => l_seed); 
+        v_nrnou:=round(DBMS_RANDOM.value(low => minnou, high => maxnou),0); 
+        v_tabind(nr):=v_nrnou;  
+        return v_nrnou; 
+    end if; 
+end f_mascare; 
+
+function f_mascare_legitim(nr number) return number is  
+    v_nrnou number; 
+    lung number;  
+begin 
+    lung:=length(to_char(nr)); 
+    v_nrnou:=to_number(rpad(substr(to_char(nr),1,1),lung,'0'));  
+    return v_nrnou; 
+end f_mascare_legitim; 
+
+function f_mascare_data(data date) return date is
+    random_day   NUMBER;
+    random_month NUMBER;
+    masked_date  DATE;
+begin
+    random_day := FLOOR(DBMS_RANDOM.VALUE(1, 29));  
+    random_month := FLOOR(DBMS_RANDOM.VALUE(1, 13)); 
+
+    masked_date := TO_DATE(
+        LPAD(random_day, 2, '0') || '-' || 
+        LPAD(random_month, 2, '0') || '-' || 
+        TO_CHAR(data, 'YYYY'),
+        'DD-MM-YYYY'
+    );
+
+    RETURN masked_date;
+end f_mascare_data;
+
+end; 
+/ 
+
+--din linie de comanda pas 
+expdp frnmp_app_admin/Admin2025!@localhost:1521/orcl tables=club,utilizator,sportiv  remap_data=club.descriere:pachet_mascare.f_mascare  remap_data=club.cod_club:pachet_mascare.f_mascare  remap_data=utilizator.nume:pachet_mascare.f_mascare   remap_data=utilizator.prenume:pachet_mascare.f_mascare  remap_data=utilizator.cod_club:pachet_mascare.f_mascare  remap_data=sportiv.numar_legitimatie:pachet_mascare.f_mascare_legitim   remap_data=sportiv.data_nastere:pachet_mascare.f_mascare_data  remap_data=sportiv.gen:pachet_mascare.f_mascare  directory=DIREXP dumpfile=FISEXPORT.dmp
+
+--impdp frnmp_app_admin/Admin2025!@localhost:1521/orcl directory=DIREXP dumpfile=FISEXPORT.DMP  TABLES=club,utilizator,sportiv remap_table=club:club1 remap_table=utilizator:utilizator1 remap_table=sportiv:sportiv1 exclude=CONSTRAINT 
+impdp frnmp_app_admin/Admin2025!@localhost:1521/orcl directory=DIREXP dumpfile=FISEXPORT.DMP tables=club remap_table=club:club1 exclude=CONSTRAINT
+ALTER TABLE CLUB1 ADD CONSTRAINT COD_CLUB1_PK PRIMARY KEY (COD_CLUB);
+
+impdp frnmp_app_admin/Admin2025!@localhost:1521/orcl directory=DIREXP dumpfile=FISEXPORT.DMP tables=utilizator remap_table=utilizator:utilizator1 exclude=CONSTRAINT
+ALTER TABLE UTILIZATOR1 ADD CONSTRAINT COD_UTILIZATOR1_PK PRIMARY KEY (COD_UTILIZATOR);
+ALTER TABLE UTILIZATOR1 ADD CONSTRAINT COD_CLUB1_FK FOREIGN KEY (COD_CLUB) REFERENCES CLUB1 (COD_CLUB);
+
+impdp frnmp_app_admin/Admin2025!@localhost:1521/orcl directory=DIREXP dumpfile=FISEXPORT.DMP tables=sportiv remap_table=sportiv:sportiv1 exclude=CONSTRAINT
+ALTER TABLE SPORTIV1 ADD CONSTRAINT COD_SPORTIV1_PK PRIMARY KEY (COD_SPORTIV);
+select * from club1;
+select * from club;
+select * from utilizator1;
+select * from utilizator;
+select * from sportiv1;
+select * from sportiv;
+
+--drop table club1;
+--drop table utilizator1;
+--drop table sportiv1;
+
+--SELECT pachet_mascare.f_mascare_data(TO_DATE('21-AUG-05', 'DD-MON-YY')) AS data_mascata FROM DUAL;

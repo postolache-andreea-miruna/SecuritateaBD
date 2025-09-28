@@ -1,0 +1,956 @@
+--creare tabele de administrator
+
+CREATE TABLE CLUB
+(cod_club NUMBER(5),
+nume VARCHAR2(50) CONSTRAINT nume_club_nn NOT NULL,
+descriere VARCHAR2(250) CONSTRAINT descriere_nn NOT NULL,
+UNIQUE (nume),
+CONSTRAINT cod_club_pk PRIMARY KEY (cod_club)
+);
+
+CREATE TABLE TARA
+(cod_tara CHAR(2),
+nume_tara VARCHAR2(25) CONSTRAINT nume_tara_nn NOT NULL,
+UNIQUE(nume_tara),
+CONSTRAINT cod_tara_pk PRIMARY KEY (cod_tara)
+);
+
+CREATE TABLE ORAS
+(cod_oras NUMBER(5),
+nume_oras VARCHAR2(25) CONSTRAINT nume_oras_nn NOT NULL,
+cod_tara CHAR(2) CONSTRAINT cod_tara_nn NOT NULL,
+CONSTRAINT cod_oras_pk PRIMARY KEY (cod_oras),
+CONSTRAINT cod_tara_fk FOREIGN KEY (cod_tara) REFERENCES TARA (cod_tara),
+UNIQUE (nume_oras)
+);
+
+CREATE TABLE TIP
+(cod_tip NUMBER(5),
+tip_competitie VARCHAR2(20) CONSTRAINT comp_tip_nn NOT NULL,
+UNIQUE(tip_competitie),
+CONSTRAINT cod_tip_pk PRIMARY KEY (cod_tip)
+);
+
+CREATE TABLE COMPETITIE
+(cod_competitie NUMBER(5),
+nume  VARCHAR2(30) CONSTRAINT nume_comp_nn NOT NULL,
+data_start DATE CONSTRAINT data_start_nn NOT NULL,
+data_final DATE CONSTRAINT data_final_nn NOT NULL, 
+cod_oras NUMBER(5) NOT NULL,
+cod_tip NUMBER(5)  NOT NULL,
+CONSTRAINT cod_competitie_pk PRIMARY KEY (cod_competitie),
+CONSTRAINT cod_tip_fk FOREIGN KEY (cod_tip) REFERENCES TIP (cod_tip),
+CONSTRAINT cod_oras_fk FOREIGN KEY (cod_oras) REFERENCES ORAS (cod_oras),
+CONSTRAINT date_concurs CHECK (data_start<data_final),
+UNIQUE (nume)
+);
+
+CREATE TABLE PROBA
+(cod_proba NUMBER(5),
+nume VARCHAR2(30) CONSTRAINT nume_proba_nn NOT NULL,
+CONSTRAINT cod_proba_pk PRIMARY KEY (cod_proba),
+UNIQUE (nume)
+);
+
+CREATE TABLE UTILIZATOR
+(cod_utilizator NUMBER(5),
+CNP RAW(32),
+nume VARCHAR2(20), 
+prenume VARCHAR2(20),
+username VARCHAR2(20),
+tip VARCHAR2(15) DEFAULT 'SPORTIV',
+cod_antrenor NUMBER(5),
+cod_club NUMBER(5) NOT NULL,
+CONSTRAINT cod_utilizator_pk PRIMARY KEY (cod_utilizator),
+CONSTRAINT cod_club_fk FOREIGN KEY (cod_club) REFERENCES CLUB (cod_club),
+CONSTRAINT cod_utilizator_fk FOREIGN KEY (cod_antrenor) REFERENCES UTILIZATOR (cod_utilizator)
+);
+
+CREATE TABLE ANTRENOR
+(cod_antrenor NUMBER(5),
+grad_pregatire NUMBER(5) NOT NULL,
+CONSTRAINT cod_antrenor_pk PRIMARY KEY (cod_antrenor),
+CONSTRAINT cod_antrenor_fk FOREIGN KEY (cod_antrenor) REFERENCES UTILIZATOR(cod_utilizator)
+);
+
+CREATE TABLE CATEGORIE
+(cod_categorie NUMBER(5),
+nume VARCHAR2(50) CONSTRAINT nume_categorie_nn NOT NULL,
+UNIQUE (nume),
+CONSTRAINT cod_categorie_pk PRIMARY KEY (cod_categorie)
+);
+
+CREATE TABLE SPORTIV
+(cod_sportiv NUMBER(5),
+numar_legitimatie NUMBER(5) CONSTRAINT numar_legitimatie_nn NOT NULL,
+data_nastere DATE CONSTRAINT nastere_sp_nn NOT NULL,
+gen CHAR(1) CONSTRAINT genul_sp_nn NOT NULL,
+CONSTRAINT genul_sp CHECK (gen='M' OR gen='F'),
+CONSTRAINT cod_sportiv_pk PRIMARY KEY (cod_sportiv),
+CONSTRAINT cod_sportiv_fk FOREIGN KEY (cod_sportiv) REFERENCES UTILIZATOR(cod_utilizator)
+);
+
+ALTER TABLE SPORTIV
+ADD cod_categorie NUMBER(5);
+
+ALTER TABLE SPORTIV
+ADD CONSTRAINT cod_categorie_fk FOREIGN KEY (cod_categorie)
+REFERENCES CATEGORIE(cod_categorie);
+ 
+
+CREATE TABLE SPONSOR
+(cod_sponsor NUMBER(5),
+nume VARCHAR2(50) CONSTRAINT nume_sponsor_nn NOT NULL,
+suma_contributie RAW(128)  CONSTRAINT suma_sponsor_nn NOT NULL,
+UNIQUE (nume),
+CONSTRAINT cod_sponsor_pk PRIMARY KEY (cod_sponsor)
+);
+
+CREATE TABLE ISTORIC
+(
+cod_sportiv NUMBER(5),
+cod_proba NUMBER(5),
+cod_competitie NUMBER(5),
+loc_per_gen NUMBER(5),
+loc_per_categorie NUMBER(5),--pe baza gen si an nastere sportiv
+timp_total NUMBER(5), --in secunde
+puncte NUMBER(5),
+CONSTRAINT pk_sportiv_proba_competitie primary key(cod_sportiv, cod_proba, cod_competitie),
+CONSTRAINT cod_ist_sportiv_fk FOREIGN KEY (cod_sportiv) REFERENCES SPORTIV (cod_sportiv),
+CONSTRAINT cod_ist_proba_fk FOREIGN KEY (cod_proba) REFERENCES PROBA (cod_proba),
+CONSTRAINT cod_ist_competitite_fk FOREIGN KEY(cod_competitie) REFERENCES COMPETITIE(cod_competitie)
+);
+
+CREATE TABLE FRNMP_APP_SPORTIV1.SPONSORIZEAZA
+(cod_sponsor NUMBER(5),
+cod_sportiv NUMBER(5),
+inceput_colaborare DATE CONSTRAINT inc_colab_nn NOT NULL,
+sfarsit_colaborare DATE CONSTRAINT sf_colab_nn NOT NULL,
+CONSTRAINT datele CHECK (inceput_colaborare<sfarsit_colaborare),
+CONSTRAINT pk_cod_sponsor_cod_sportiv_colab PRIMARY KEY (cod_sponsor,cod_sportiv,inceput_colaborare),
+CONSTRAINT cod_sponsor_fk FOREIGN KEY (cod_sponsor) REFERENCES SPONSOR (cod_sponsor),
+CONSTRAINT cod_sportiv_fk FOREIGN KEY (cod_sportiv) REFERENCES SPORTIV (cod_sportiv)
+);
+
+CREATE TABLE FRNMP_APP_SPORTIV2.SPONSORIZEAZA
+(cod_sponsor NUMBER(5),
+cod_sportiv NUMBER(5),
+inceput_colaborare DATE CONSTRAINT inc_colab_nn NOT NULL,
+sfarsit_colaborare DATE CONSTRAINT sf_colab_nn NOT NULL,
+CONSTRAINT datele CHECK (inceput_colaborare<sfarsit_colaborare),
+CONSTRAINT pk_cod_sponsor_cod_sportiv_colab PRIMARY KEY (cod_sponsor,cod_sportiv,inceput_colaborare),
+CONSTRAINT cod_sponsor_fk FOREIGN KEY (cod_sponsor) REFERENCES SPONSOR (cod_sponsor),
+CONSTRAINT cod_sportiv_fk FOREIGN KEY (cod_sportiv) REFERENCES SPORTIV (cod_sportiv)
+);
+
+CREATE TABLE FRNMP_APP_SPORTIV3.SPONSORIZEAZA
+(cod_sponsor NUMBER(5),
+cod_sportiv NUMBER(5),
+inceput_colaborare DATE CONSTRAINT inc_colab_nn NOT NULL,
+sfarsit_colaborare DATE CONSTRAINT sf_colab_nn NOT NULL,
+CONSTRAINT datele CHECK (inceput_colaborare<sfarsit_colaborare),
+CONSTRAINT pk_cod_sponsor_cod_sportiv_colab PRIMARY KEY (cod_sponsor,cod_sportiv,inceput_colaborare),
+CONSTRAINT cod_sponsor_fk FOREIGN KEY (cod_sponsor) REFERENCES SPONSOR (cod_sponsor),
+CONSTRAINT cod_sportiv_fk FOREIGN KEY (cod_sportiv) REFERENCES SPORTIV (cod_sportiv)
+);
+
+CREATE TABLE FRNMP_APP_SPORTIV4.SPONSORIZEAZA
+(cod_sponsor NUMBER(5),
+cod_sportiv NUMBER(5),
+inceput_colaborare DATE CONSTRAINT inc_colab_nn NOT NULL,
+sfarsit_colaborare DATE CONSTRAINT sf_colab_nn NOT NULL,
+CONSTRAINT datele CHECK (inceput_colaborare<sfarsit_colaborare),
+CONSTRAINT pk_cod_sponsor_cod_sportiv_colab PRIMARY KEY (cod_sponsor,cod_sportiv,inceput_colaborare),
+CONSTRAINT cod_sponsor_fk FOREIGN KEY (cod_sponsor) REFERENCES SPONSOR (cod_sponsor),
+CONSTRAINT cod_sportiv_fk FOREIGN KEY (cod_sportiv) REFERENCES SPORTIV (cod_sportiv)
+);
+
+CREATE TABLE FRNMP_APP_SPORTIV5.SPONSORIZEAZA
+(cod_sponsor NUMBER(5),
+cod_sportiv NUMBER(5),
+inceput_colaborare DATE CONSTRAINT inc_colab_nn NOT NULL,
+sfarsit_colaborare DATE CONSTRAINT sf_colab_nn NOT NULL,
+CONSTRAINT datele CHECK (inceput_colaborare<sfarsit_colaborare),
+CONSTRAINT pk_cod_sponsor_cod_sportiv_colab PRIMARY KEY (cod_sponsor,cod_sportiv,inceput_colaborare),
+CONSTRAINT cod_sponsor_fk FOREIGN KEY (cod_sponsor) REFERENCES SPONSOR (cod_sponsor),
+CONSTRAINT cod_sportiv_fk FOREIGN KEY (cod_sportiv) REFERENCES SPORTIV (cod_sportiv)
+);
+
+--inserarea de date
+
+--de administrator a datelor care nu implica criptarea
+
+-- club
+INSERT INTO CLUB
+VALUES(1, 'AQUA TEAM','Facem valuri si cream campioni in fiecare moment');
+
+INSERT INTO CLUB
+VALUES(2, 'DELFINUL BUCURESTI','Aici delfinii inoata cu pasiune si putere');
+
+INSERT INTO CLUB
+VALUES(3, 'BUCHAREST SPORT CLUB ELITE','Excelenta cu fiecare lovitura, succes in fiecare cursa');
+
+select * from club;
+commit;
+
+-- tara
+INSERT INTO TARA(cod_tara,nume_tara)
+VALUES('RO','ROMANIA');
+
+INSERT INTO TARA(cod_tara,nume_tara)
+VALUES('PO','POLONIA');
+
+INSERT INTO TARA(cod_tara,nume_tara)
+VALUES('FR','FRANTA');
+
+INSERT INTO TARA(cod_tara,nume_tara)
+VALUES('JP','JAPONIA');
+
+INSERT INTO TARA(cod_tara,nume_tara)
+VALUES('IT','ITALIA');
+
+INSERT INTO TARA(cod_tara,nume_tara)
+VALUES('KO','KOREA');
+
+commit;
+
+-- oras
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (1,'BUCURESTI','RO');
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (2,'CRAIOVA','RO');
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (3,'LUBLIN','PO');
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (4,'PARIS','FR');
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (5,'KYOTO','JP');
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (6,'NAPOLI','IT');
+
+INSERT INTO ORAS(cod_oras,nume_oras,cod_tara)
+VALUES (7,'GWANGJU','KO');
+
+COMMIT;
+
+--tip
+INSERT INTO TIP(cod_tip, tip_competitie)
+VALUES(1,'LOCAL');
+
+INSERT INTO TIP(cod_tip, tip_competitie)
+VALUES(2,'MUNICIPAL');
+
+INSERT INTO TIP(cod_tip, tip_competitie)
+VALUES(3,'JUDETEAN');
+
+INSERT INTO TIP(cod_tip, tip_competitie)
+VALUES(4,'EUROPEAN');
+
+INSERT INTO TIP(cod_tip, tip_competitie)
+VALUES(5,'BALCANIC');
+
+INSERT INTO TIP(cod_tip, tip_competitie)
+VALUES(6,'MONDIAL');
+
+COMMIT;
+--proba 
+INSERT INTO PROBA(cod_proba,nume)
+VALUES(1,'50 LIBER');
+
+INSERT INTO PROBA(cod_proba,nume)
+VALUES(2,'50 SPATE');
+
+INSERT INTO PROBA(cod_proba,nume)
+VALUES(3,'100 LIBER');
+
+INSERT INTO PROBA(cod_proba,nume)
+VALUES(4,'200 BRAS');
+
+INSERT INTO PROBA(cod_proba,nume)
+VALUES(5,'200 FLUTURE');
+
+INSERT INTO PROBA(cod_proba,nume)
+VALUES(6,'400 LIBER');
+
+COMMIT;
+--competitie
+INSERT INTO COMPETITIE(cod_competitie,nume,data_start,data_final,cod_oras,cod_tip)
+VALUES(1,'CUPA DE TOAMNA 2024',TO_DATE('05-11-2024','DD-MM-YYYY'),TO_DATE('06-11-2024','DD-MM-YYYY'),1,6); --concurs mondial bucuresti
+
+INSERT INTO COMPETITIE(cod_competitie,nume,data_start,data_final,cod_oras,cod_tip)
+VALUES(2,'CUPA DE IARNA 2024',TO_DATE('10-12-2024','DD-MM-YYYY'),TO_DATE('11-12-2024','DD-MM-YYYY'),1,1); --concurs LOCAL bucuresti
+
+INSERT INTO COMPETITIE(cod_competitie,nume,data_start,data_final,cod_oras,cod_tip)
+VALUES(3,'CUPA DE ANUL NOU 2025',TO_DATE('03-01-2025','DD-MM-YYYY'),TO_DATE('04-01-2025','DD-MM-YYYY'),4,4);
+
+commit;
+SELECT * FROM COMPETITIE;
+--il pun aici ca sa vad ca merge triggerul.
+SELECT * FROM TIP;
+SELECT * FROM ORAS;
+INSERT INTO FRNMP_APP_ADMIN.ISTORIC(cod_sportiv, cod_proba, cod_competitie, loc_per_gen,loc_per_categorie, timp_total, puncte)
+VALUES(5,1,1,15,3,26,180);
+commit;
+
+--pentru categorie
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (1,'SENIOR F');
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (2,'SENIOR M');
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (3,'TINERET F');
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (4,'TINERET M');
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (5,'JUNIOR 1 F');
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (6,'JUNIOR 1 M');
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (7,'JUNIOR 2 F');
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (8,'JUNIOR 2 M');
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (9,'CADET F');
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (10,'CADET M');
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (11,'COPIL 11 F');
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (12,'COPIL 11 M');
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (13,'COPIL 10 F');
+INSERT INTO CATEGORIE(cod_categorie,nume) VALUES (14,'COPIL 10 M');
+SELECT * FROM CATEGORIE;
+commit;
+
+
+--inserare de administrator date in tabele care necesita criptare
+
+CREATE TABLE CHEIE_CRIPT_DECR (
+    id_cheie NUMBER(5) PRIMARY KEY,
+    cheie_val RAW(128),
+    tabel VARCHAR2(50) UNIQUE
+);
+
+
+CREATE OR REPLACE FUNCTION CRIPTARE_SUMA_ADM(
+    suma_contributie NUMBER
+) RETURN RAW IS
+    cheie_actuala RAW(128);
+    nr_chei NUMBER;
+    mod_operare PLS_INTEGER := DBMS_CRYPTO.ENCRYPT_AES128 + 
+                          DBMS_CRYPTO.PAD_PKCS5 + 
+                          DBMS_CRYPTO.CHAIN_CBC;
+BEGIN
+    SELECT COUNT(*) INTO nr_chei 
+    FROM CHEIE_CRIPT_DECR 
+    WHERE tabel = 'SPONSOR';
+    
+     IF nr_chei = 0 THEN
+        cheie_actuala := DBMS_CRYPTO.RANDOMBYTES(16);
+        
+        INSERT INTO CHEIE_CRIPT_DECR (id_cheie, cheie_val, tabel)
+        VALUES (
+            (SELECT NVL(MAX(id_cheie), 0) + 1 FROM CHEIE_CRIPT_DECR), 
+            cheie_actuala, 
+            'SPONSOR'
+        );
+    ELSE
+    
+        SELECT cheie_val INTO cheie_actuala 
+        FROM CHEIE_CRIPT_DECR 
+        WHERE tabel = 'SPONSOR';
+    END IF;
+
+    RETURN DBMS_CRYPTO.ENCRYPT(
+         UTL_I18N.STRING_TO_RAW(TO_CHAR(suma_contributie)),
+         mod_operare,
+         cheie_actuala
+    );
+END;
+/
+CREATE OR REPLACE FUNCTION DECRIPTARE_SUMA_ADM(
+    nume_sponsor VARCHAR2
+) RETURN NUMBER IS
+    suma_contrib RAW(128);
+    cheie_actuala RAW(128);
+    mod_operare PLS_INTEGER := DBMS_CRYPTO.ENCRYPT_AES128 + 
+                          DBMS_CRYPTO.PAD_PKCS5 + 
+                          DBMS_CRYPTO.CHAIN_CBC;
+BEGIN
+
+    SELECT suma_contributie INTO suma_contrib
+    FROM SPONSOR
+    WHERE nume = nume_sponsor;
+    
+    SELECT cheie_val INTO cheie_actuala 
+    FROM CHEIE_CRIPT_DECR 
+    WHERE tabel = 'SPONSOR';
+
+
+    RETURN TO_NUMBER(UTL_I18N.RAW_TO_CHAR( 
+        DBMS_CRYPTO.decrypt(
+            suma_contrib,
+            mod_operare,
+            cheie_actuala
+         ),
+     'AL32UTF8'));
+END;
+/
+
+INSERT INTO SPONSOR(cod_sponsor,nume,suma_contributie)
+VALUES (1,'RED BULL',CRIPTARE_SUMA_ADM(500));
+
+INSERT INTO SPONSOR(cod_sponsor,nume,suma_contributie)
+VALUES (2,'ISOSTAR',CRIPTARE_SUMA_ADM(600.4));
+--delete from sponsor;
+--select * from sponsor;
+
+SELECT DECRIPTARE_SUMA_ADM('RED BULL') 
+FROM dual;
+
+SELECT DECRIPTARE_SUMA_ADM('ISOSTAR') 
+FROM dual;
+
+--pentru tabel UTILIZATOR
+CREATE OR REPLACE FUNCTION CRIPTARE_UTILIZ_ADM(
+    cnp_ul VARCHAR2
+) RETURN RAW IS
+    cheie_actuala RAW(128);
+    nr_chei NUMBER;
+    mod_operare PLS_INTEGER := DBMS_CRYPTO.ENCRYPT_AES128 + 
+                          DBMS_CRYPTO.PAD_PKCS5 + 
+                          DBMS_CRYPTO.CHAIN_CBC;
+BEGIN
+    SELECT COUNT(*) INTO nr_chei 
+    FROM CHEIE_CRIPT_DECR 
+    WHERE tabel = 'UTILIZATOR';
+    
+     IF nr_chei = 0 THEN
+        cheie_actuala := DBMS_CRYPTO.RANDOMBYTES(16);
+        
+        INSERT INTO CHEIE_CRIPT_DECR (id_cheie, cheie_val, tabel)
+        VALUES (
+            (SELECT NVL(MAX(id_cheie), 0) + 1 FROM CHEIE_CRIPT_DECR), 
+            cheie_actuala, 
+            'UTILIZATOR'
+        );
+    ELSE
+    
+        SELECT cheie_val INTO cheie_actuala 
+        FROM CHEIE_CRIPT_DECR 
+        WHERE tabel = 'UTILIZATOR';
+    END IF;
+
+    RETURN DBMS_CRYPTO.ENCRYPT(
+         UTL_I18N.STRING_TO_RAW(cnp_ul),
+         mod_operare,
+         cheie_actuala
+    );
+END;
+/
+
+
+CREATE OR REPLACE FUNCTION DECRIPTARE_UTILIZ_ADM(
+    username_utiliz VARCHAR2
+) RETURN NUMBER IS
+    cnp_ul RAW(128);
+    cheie_actuala RAW(128);
+    mod_operare PLS_INTEGER := DBMS_CRYPTO.ENCRYPT_AES128 + 
+                          DBMS_CRYPTO.PAD_PKCS5 + 
+                          DBMS_CRYPTO.CHAIN_CBC;
+BEGIN
+
+    SELECT CNP INTO cnp_ul
+    FROM UTILIZATOR
+    WHERE username = username_utiliz;
+    
+    SELECT cheie_val INTO cheie_actuala 
+    FROM CHEIE_CRIPT_DECR 
+    WHERE tabel = 'UTILIZATOR';
+
+
+    RETURN TO_NUMBER(UTL_I18N.RAW_TO_CHAR( 
+        DBMS_CRYPTO.decrypt(
+            cnp_ul,
+            mod_operare,
+            cheie_actuala
+         ),
+     'AL32UTF8'));
+END;
+/
+
+INSERT INTO UTILIZATOR 
+VALUES (1,CRIPTARE_UTILIZ_ADM('1850223145522'),'BRAN','IONEL','FRNMP_ANTRENOR1', 'ANTRENOR',NULL,1);
+
+INSERT INTO UTILIZATOR 
+VALUES (2,CRIPTARE_UTILIZ_ADM('2960225640002'),'STAN','DENISA','FRNMP_ANTRENOR2', 'ANTRENOR',1,1);
+
+INSERT INTO UTILIZATOR 
+VALUES (3,CRIPTARE_UTILIZ_ADM('2951230111012'),'TANCI','MARIA','FRNMP_ANTRENOR3', 'ANTRENOR',1,2);
+
+INSERT INTO UTILIZATOR 
+VALUES (4,CRIPTARE_UTILIZ_ADM('1630823578936'),'GRIGORAS','MARIN','FRNMP_ANTRENOR4', 'ANTRENOR',2,3);
+
+SELECT * FROM UTILIZATOR;
+
+SELECT DECRIPTARE_UTILIZ_ADM('FRNMP_ANTRENOR1') FROM DUAL;
+INSERT INTO ANTRENOR VALUES(1,20);
+INSERT INTO ANTRENOR VALUES(2,9);
+INSERT INTO ANTRENOR VALUES(3,5);
+INSERT INTO ANTRENOR VALUES(4,12);
+
+SELECT * FROM ANTRENOR;
+select * from UTILIZATOR ;
+INSERT INTO UTILIZATOR 
+VALUES (5,CRIPTARE_UTILIZ_ADM('7050821555520'),'DRAGU','STELIAN','FRNMP_APP_SPORTIV1', 'SPORTIV',1,1);
+
+INSERT INTO UTILIZATOR 
+VALUES (6,CRIPTARE_UTILIZ_ADM('6050426785520'),'MICU','DENISA','FRNMP_APP_SPORTIV2', 'SPORTIV',2,1);
+
+INSERT INTO UTILIZATOR 
+VALUES (7,CRIPTARE_UTILIZ_ADM('6001230121030'),'MARCU','MARIA','FRNMP_APP_SPORTIV3', 'SPORTIV',3,2);
+
+INSERT INTO UTILIZATOR 
+VALUES (8,CRIPTARE_UTILIZ_ADM('7110325871101'),'STAN','FILIP','FRNMP_APP_SPORTIV4', 'SPORTIV',4,3);
+
+INSERT INTO UTILIZATOR 
+VALUES (9,CRIPTARE_UTILIZ_ADM('7111015775232'),'MISTI','SAR','FRNMP_APP_SPORTIV5', 'SPORTIV',1,1);
+
+select * from categorie;
+INSERT INTO SPORTIV
+VALUES (5,1,TO_DATE('21-08-2005','DD-MM-YYYY'),'M');
+
+UPDATE SPORTIV
+SET cod_categorie = 2
+WHERE cod_sportiv = 5;
+
+insert INTO SPORTIV
+VALUES (6,2,TO_DATE('26-04-2005','DD-MM-YYYY'),'F');
+
+UPDATE SPORTIV
+SET cod_categorie = 1
+WHERE cod_sportiv = 6;
+
+INSERT INTO SPORTIV
+VALUES (7,3,TO_DATE('30-12-2000','DD-MM-YYYY'),'F');
+
+UPDATE SPORTIV
+SET cod_categorie = 1
+WHERE cod_sportiv = 7;
+
+INSERT INTO SPORTIV
+VALUES (8,4,TO_DATE('25-03-2011','DD-MM-YYYY'),'M');
+
+UPDATE SPORTIV
+SET cod_categorie = 8
+WHERE cod_sportiv = 8;
+
+INSERT INTO SPORTIV
+VALUES (9,5,TO_DATE('15-10-2011','DD-MM-YYYY'),'M');
+
+UPDATE SPORTIV
+SET cod_categorie = 8
+WHERE cod_sportiv = 9;
+
+commit;
+
+SELECT * FROM SPORTIV;
+
+
+--pentru inserarea de date de antrenor in ISTORIC administratorul creeaza precedura antrenor_insert_istoric
+--iar antrenorul are nevoie de anumite vizualizari
+CREATE OR REPLACE PROCEDURE antrenor_insert_istoric (
+    p_legitimatie_sportiv IN NUMBER,
+    p_nume_proba IN VARCHAR2,
+    p_nume_competitie IN VARCHAR2,
+    p_loc_per_gen IN NUMBER,
+    p_loc_per_categorie IN NUMBER,
+    p_timp_total IN NUMBER,
+    p_puncte IN NUMBER
+) IS
+    v_cod_competitie NUMBER(5);
+    v_cod_proba NUMBER(5);
+    v_cod_sportiv NUMBER(5);
+BEGIN
+
+    SELECT cod_sportiv 
+    INTO v_cod_sportiv
+    FROM frnmp_app_admin.sportiv 
+    WHERE numar_legitimatie = p_legitimatie_sportiv;
+    
+    SELECT cod_competitie 
+    INTO v_cod_competitie
+    FROM frnmp_app_admin.COMPETITIE 
+    WHERE nume = p_nume_competitie;
+
+    SELECT cod_proba
+    INTO v_cod_proba
+    FROM frnmp_app_admin.PROBA 
+    WHERE nume = p_nume_proba;
+
+    INSERT INTO frnmp_app_admin.ISTORIC (
+        cod_sportiv, cod_proba, cod_competitie, loc_per_gen, 
+        loc_per_categorie, timp_total, puncte
+    ) VALUES (
+        v_cod_sportiv, v_cod_proba, v_cod_competitie, p_loc_per_gen, 
+        p_loc_per_categorie, p_timp_total, p_puncte
+    );
+    
+    COMMIT;
+END;
+/
+
+SELECT * FROM COMPETITIE;
+CREATE OR REPLACE VIEW view_competitie AS
+SELECT nume
+FROM frnmp_app_admin.competitie;
+
+CREATE OR REPLACE VIEW view_proba AS
+SELECT nume
+FROM frnmp_app_admin.proba;
+
+CREATE OR REPLACE VIEW view_sportivi_antrenor AS
+SELECT nume,prenume,numar_legitimatie,data_nastere,gen
+FROM frnmp_app_admin.sportiv sp JOIN frnmp_app_admin.utilizator ut
+ON sp.cod_sportiv = ut.cod_utilizator
+WHERE ut.cod_antrenor = (SELECT cod_utilizator FROM frnmp_app_admin.utilizator WHERE username = USER);
+
+CREATE OR REPLACE VIEW view_istoric_sportivi_antrenor AS
+SELECT ut.nume as nume_sp,ut.prenume,sp.numar_legitimatie,sp.data_nastere,sp.gen, ist.loc_per_gen,ist.loc_per_categorie,ist.timp_total,ist.puncte,pr.nume as proba,compe.nume as competitie
+FROM frnmp_app_admin.istoric ist JOIN frnmp_app_admin.sportiv sp ON ist.cod_sportiv = sp.cod_sportiv
+JOIN frnmp_app_admin.utilizator ut ON sp.cod_sportiv = ut.cod_utilizator
+JOIN frnmp_app_admin.PROBA pr ON ist.cod_proba = pr.cod_proba 
+JOIN frnmp_app_admin.COMPETITIE compe ON ist.cod_competitie = compe.cod_competitie
+WHERE ut.cod_antrenor = (SELECT cod_utilizator FROM frnmp_app_admin.utilizator WHERE username = USER);
+
+--inserari in ISTORIC de catre autori
+
+--frnmp_antrenor1
+select * from frnmp_app_admin.view_sportivi_antrenor;
+select * from frnmp_app_admin.view_proba;
+select * from frnmp_app_admin.view_competitie;
+EXEC frnmp_app_admin.antrenor_insert_istoric(1, '50 LIBER', 'CUPA DE TOAMNA 2024', 0, 0, 0, 0);
+select * from frnmp_app_admin.view_istoric_sportivi_antrenor;
+
+rollback;
+SELECT sys_context('APLICATIE_CTX', 'PROGRAM_POTRIVIT') FROM dual;
+set SERVEROUTPUT on;
+EXEC frnmp_app_admin.antrenor_insert_istoric(1, '50 SPATE', 'CUPA DE TOAMNA 2024', 0, 0, 0, 0);
+--AM RULAT VINERI LA ORA 18:50 SI IMI ZICE CA SUNT IN AFARA PROGRAMULUI, CEEA CE E BINE
+
+--Error starting at line : 7 in command -
+--BEGIN frnmp_app_admin.antrenor_insert_istoric(1, '50 SPATE', 'CUPA DE TOAMNA 2024', 0, 0, 0, 0); END;
+--Error report -
+--ORA-20001: Sunteti in afara programului
+--ORA-06512: at "FRNMP_APP_ADMIN.INSCRIERE_SP_TRIGGER", line 3
+--ORA-04088: error during execution of trigger 'FRNMP_APP_ADMIN.INSCRIERE_SP_TRIGGER'
+--ORA-06512: at "FRNMP_APP_ADMIN.ANTRENOR_INSERT_ISTORIC", line 30
+--ORA-06512: at line 1
+
+
+--alte inserari
+EXEC frnmp_app_admin.antrenor_insert_istoric(5, '50 LIBER', 'CUPA DE TOAMNA 2024', 0, 0, 0, 0);
+EXEC frnmp_app_admin.antrenor_insert_istoric(1, '50 SPATE', 'CUPA DE TOAMNA 2024', 0, 0, 0, 0);
+EXEC frnmp_app_admin.antrenor_insert_istoric(5, '50 SPATE', 'CUPA DE TOAMNA 2024', 0, 0, 0, 0);
+EXEC frnmp_app_admin.antrenor_insert_istoric(1, '200 BRAS', 'CUPA DE TOAMNA 2024', 0, 0, 0, 0);
+
+EXEC frnmp_app_admin.antrenor_insert_istoric(1, '50 LIBER', 'CUPA DE IARNA 2024', 0, 0, 0, 0);
+
+EXEC frnmp_app_admin.antrenor_insert_istoric(1, '50 LIBER', 'CUPA DE ANUL NOU 2025', 0, 0, 0, 0);
+EXEC frnmp_app_admin.antrenor_insert_istoric(1, '100 LIBER', 'CUPA DE ANUL NOU 2025', 0, 0, 0, 0);
+
+--testare in afara programului
+EXEC frnmp_app_admin.antrenor_insert_istoric(1, '50 SPATE', 'CUPA DE ANUL NOU 2025', 0, 0, 0, 0);
+
+
+--frnmp_antrenor2
+
+SELECT sys_context('APLICATIE_CTX', 'PROGRAM_POTRIVIT') FROM dual;
+set SERVEROUTPUT on;
+select * from frnmp_app_admin.view_sportivi_antrenor;
+select * from frnmp_app_admin.view_proba;
+select * from frnmp_app_admin.view_competitie;
+select * from frnmp_app_admin.view_istoric_sportivi_antrenor;
+
+EXEC frnmp_app_admin.antrenor_insert_istoric(2, '50 LIBER', 'CUPA DE TOAMNA 2024', 0, 0, 0, 0);
+EXEC frnmp_app_admin.antrenor_insert_istoric(2, '100 LIBER', 'CUPA DE TOAMNA 2024', 0, 0, 0, 0);
+
+EXEC frnmp_app_admin.antrenor_insert_istoric(2, '50 LIBER', 'CUPA DE IARNA 2024', 0, 0, 0, 0);
+commit;
+
+
+--frnmp_antrenor3
+select * from frnmp_app_admin.view_sportivi_antrenor;
+select * from frnmp_app_admin.view_proba;
+select * from frnmp_app_admin.view_competitie;
+select * from frnmp_app_admin.view_istoric_sportivi_antrenor;
+
+EXEC frnmp_app_admin.antrenor_insert_istoric(3, '50 LIBER', 'CUPA DE TOAMNA 2024', 0, 0, 0, 0);
+EXEC frnmp_app_admin.antrenor_insert_istoric(3, '100 LIBER', 'CUPA DE TOAMNA 2024', 0, 0, 0, 0);
+EXEC frnmp_app_admin.antrenor_insert_istoric(3, '50 LIBER', 'CUPA DE IARNA 2024', 0, 0, 0, 0);
+commit;
+
+--frnmp_antrenor4
+select * from frnmp_app_admin.view_sportivi_antrenor;
+select * from frnmp_app_admin.view_proba;
+select * from frnmp_app_admin.view_competitie;
+select * from frnmp_app_admin.view_istoric_sportivi_antrenor;
+
+EXEC frnmp_app_admin.antrenor_insert_istoric(4, '50 LIBER', 'CUPA DE TOAMNA 2024', 0, 0, 0, 0);
+EXEC frnmp_app_admin.antrenor_insert_istoric(4, '50 SPATE', 'CUPA DE TOAMNA 2024', 0, 0, 0, 0);
+commit;
+
+
+--pentru a avea la final datele complete 
+--trebuie sa le permitem arbitrilor sa updateze datele din istoric
+--mai intai administratorul trebuie sa faca o vizualizare
+
+--administrator
+CREATE OR REPLACE VIEW view_istoric_arbitru AS
+SELECT sp.numar_legitimatie,ut.nume as nume_sp,ut.prenume,sp.data_nastere,sp.gen,ist.loc_per_gen,ist.loc_per_categorie,ist.timp_total,ist.puncte,pr.nume as proba,compe.nume as competitie,sp.cod_sportiv,pr.cod_proba,compe.cod_competitie
+FROM frnmp_app_admin.istoric ist JOIN frnmp_app_admin.sportiv sp ON ist.cod_sportiv = sp.cod_sportiv
+JOIN frnmp_app_admin.utilizator ut ON sp.cod_sportiv = ut.cod_utilizator
+JOIN frnmp_app_admin.PROBA pr ON ist.cod_proba = pr.cod_proba 
+JOIN frnmp_app_admin.COMPETITIE compe ON ist.cod_competitie = compe.cod_competitie;
+
+select * from istoric;
+select * from sportiv;
+--delete from istoric;
+
+
+--frnmp_arbitru1 face actualizari
+select * from frnmp_app_admin.view_istoric_arbitru;
+set SERVEROUTPUT on;
+UPDATE frnmp_app_admin.istoric
+SET loc_per_gen = 15,loc_per_categorie=3,timp_total=26,puncte=170
+WHERE cod_competitie = 1 and cod_sportiv = 5 and cod_proba = 1; --ESTE COMPETITIE MONDIALA SI MAXIMUL ESTE DE 150 DE PUNCTE,
+COMMIT;
+--IAR ACUM ESTE DECLANSAT TRIGGERUL AUDIT SI POLITICA DE AUDIT policy_istoric si auditul standard
+
+--acum se pune numarul corect de puncte
+UPDATE frnmp_app_admin.istoric
+SET loc_per_gen = 15,loc_per_categorie=3,timp_total=26,puncte=130
+WHERE cod_competitie = 1 and cod_sportiv = 5 and cod_proba = 1; 
+COMMIT;
+--IAR ACUM ESTE DECLANSATA POLITICA DE AUDIT policy_istoric si auditul standard
+
+--pentru exercitiul 6 - context aplicatie
+
+UPDATE frnmp_app_admin.istoric --l-am facut intr-o zi de vineri deci nu trebuie sa ma lase
+SET loc_per_gen = 2,loc_per_categorie=3,timp_total=32,puncte=130
+WHERE cod_competitie = 1 and cod_sportiv = 5 and cod_proba = 3; 
+COMMIT;
+--Error report -SQL Error: ORA-20002: Sunteti in afara programului de arbitrare si contestatii (a aparut eroarea deci e bine)
+--IAR CAND AM RULAT IN WEEKEN S-A INSERAT.
+
+
+--
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 1,loc_per_categorie=1,timp_total=27,puncte=150
+WHERE cod_sportiv = 6 and cod_proba = 1 and cod_competitie = 1; 
+COMMIT;
+
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 10,loc_per_categorie=4,timp_total=33,puncte=120
+WHERE cod_sportiv = 7 and cod_proba = 1 and cod_competitie = 1; 
+COMMIT;
+
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 9,loc_per_categorie=2,timp_total=20,puncte=140
+WHERE cod_sportiv = 8 and cod_proba = 1 and cod_competitie = 1; 
+COMMIT;
+
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 20,loc_per_categorie=5,timp_total=32,puncte=110
+WHERE cod_sportiv = 9 and cod_proba = 1 and cod_competitie = 1; 
+COMMIT;
+
+
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 3,loc_per_categorie=2,timp_total=46,puncte=140
+WHERE cod_sportiv = 6 and cod_proba = 3 and cod_competitie = 1; 
+COMMIT;
+
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 1,loc_per_categorie=1,timp_total=44,puncte=150
+WHERE cod_sportiv = 7 and cod_proba = 3 and cod_competitie = 1; 
+COMMIT;
+
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 3,loc_per_categorie=1,timp_total=27,puncte=150
+WHERE cod_sportiv = 5 and cod_proba = 2 and cod_competitie = 1; 
+COMMIT;
+
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 2,loc_per_categorie=2,timp_total=26,puncte=140
+WHERE cod_sportiv = 8 and cod_proba = 2 and cod_competitie = 1; 
+COMMIT;
+
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 1,loc_per_categorie=1,timp_total=25,puncte=150
+WHERE cod_sportiv = 9 and cod_proba = 2 and cod_competitie = 1; 
+COMMIT;
+
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 1,loc_per_categorie=1,timp_total=60,puncte=150
+WHERE cod_sportiv = 5 and cod_proba = 4 and cod_competitie = 1; 
+COMMIT;
+
+--comp cu id 2
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 15,loc_per_categorie=2,timp_total=24,puncte=14
+WHERE cod_sportiv = 5 and cod_proba = 1 and cod_competitie = 2; 
+COMMIT;
+
+
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 2,loc_per_categorie=2,timp_total=29,puncte=14
+WHERE cod_sportiv = 6 and cod_proba = 1 and cod_competitie = 2; 
+COMMIT;
+
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 1,loc_per_categorie=1,timp_total=28,puncte=15
+WHERE cod_sportiv = 7 and cod_proba = 1 and cod_competitie = 2; 
+COMMIT;
+
+--competitie cu id 3
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 9,loc_per_categorie=3,timp_total=27,puncte=130
+WHERE cod_sportiv = 5 and cod_proba = 1 and cod_competitie = 3; 
+COMMIT;
+
+UPDATE frnmp_app_admin.istoric 
+SET loc_per_gen = 1,loc_per_categorie=1,timp_total=30,puncte=150
+WHERE cod_sportiv = 5 and cod_proba = 3 and cod_competitie = 3; 
+COMMIT;
+
+
+--pentru ca reprezentantii companiilor sa poata insera,updata in SPONSORIZEAZA
+--adminstratorul creeaza vizualizari si triggeri
+
+--CREATE TABLE FRNMP_APP_SPORTIV1.SPONSORIZEAZA
+--(cod_sponsor NUMBER(5),
+--cod_sportiv NUMBER(5),
+--inceput_colaborare DATE CONSTRAINT inc_colab_nn NOT NULL,
+--sfarsit_colaborare DATE CONSTRAINT sf_colab_nn NOT NULL,
+--CONSTRAINT datele CHECK (inceput_colaborare<sfarsit_colaborare),
+--CONSTRAINT pk_cod_sponsor_cod_sportiv_colab PRIMARY KEY (cod_sponsor,cod_sportiv,inceput_colaborare),
+--CONSTRAINT cod_sponsor_fk FOREIGN KEY (cod_sponsor) REFERENCES SPONSOR (cod_sponsor),
+--CONSTRAINT cod_sportiv_fk FOREIGN KEY (cod_sportiv) REFERENCES SPORTIV (cod_sportiv)
+--);
+
+SELECT * FROM SPORTIV; -- COD SPORTIV: 5-9
+SELECT * FROM SPONSOR;
+SELECT * FROM COMPETITIE;
+SELECT * FROM TIP;
+select * from FRNMP_APP_SPORTIV1.sponsorizeaza; --se vede doar dupa ce reprezentantul companiei da commit la insert
+CREATE OR REPLACE VIEW VIZ_SPONSORIZARE AS
+    SELECT COD_SPONSOR, INCEPUT_COLABORARE, SFARSIT_COLABORARE, 'SPORTIV1' AS cod_sportiv
+    FROM FRNMP_APP_SPORTIV1.SPONSORIZEAZA
+    UNION
+    SELECT COD_SPONSOR, INCEPUT_COLABORARE, SFARSIT_COLABORARE, 'SPORTIV2' AS cod_sportiv
+    FROM FRNMP_APP_SPORTIV2.SPONSORIZEAZA
+    UNION
+    SELECT COD_SPONSOR, INCEPUT_COLABORARE, SFARSIT_COLABORARE, 'SPORTIV3' AS cod_sportiv
+    FROM FRNMP_APP_SPORTIV3.SPONSORIZEAZA
+    UNION
+    SELECT COD_SPONSOR, INCEPUT_COLABORARE, SFARSIT_COLABORARE, 'SPORTIV4' AS cod_sportiv
+    FROM FRNMP_APP_SPORTIV4.SPONSORIZEAZA
+    UNION
+    SELECT COD_SPONSOR, INCEPUT_COLABORARE, SFARSIT_COLABORARE, 'SPORTIV5' AS cod_sportiv
+    FROM FRNMP_APP_SPORTIV5.SPONSORIZEAZA;
+/
+--pentru inserarea datelor in tabela sponsorizeaza este nevoie de un trigger instead of
+CREATE OR REPLACE TRIGGER TRIGGER_SPONSORIZARE
+INSTEAD OF INSERT ON VIZ_SPONSORIZARE  
+FOR EACH ROW  
+BEGIN 
+   IF :NEW.COD_SPORTIV='SPORTIV1' THEN 
+      INSERT INTO FRNMP_APP_SPORTIV1.SPONSORIZEAZA
+      VALUES(:NEW.COD_SPONSOR,5,:NEW.INCEPUT_COLABORARE,:NEW.SFARSIT_COLABORARE); 
+   END IF; 
+   IF :NEW.COD_SPORTIV='SPORTIV2' THEN 
+      INSERT INTO FRNMP_APP_SPORTIV2.SPONSORIZEAZA
+      VALUES(:NEW.COD_SPONSOR,6,:NEW.INCEPUT_COLABORARE,:NEW.SFARSIT_COLABORARE); 
+   END IF; 
+   IF :NEW.COD_SPORTIV='SPORTIV3' THEN 
+      INSERT INTO FRNMP_APP_SPORTIV3.SPONSORIZEAZA
+      VALUES(:NEW.COD_SPONSOR,7,:NEW.INCEPUT_COLABORARE,:NEW.SFARSIT_COLABORARE); 
+   END IF; 
+   IF :NEW.COD_SPORTIV='SPORTIV4' THEN 
+      INSERT INTO FRNMP_APP_SPORTIV4.SPONSORIZEAZA
+      VALUES(:NEW.COD_SPONSOR,8,:NEW.INCEPUT_COLABORARE,:NEW.SFARSIT_COLABORARE); 
+   END IF; 
+   IF :NEW.COD_SPORTIV='SPORTIV5' THEN 
+      INSERT INTO FRNMP_APP_SPORTIV5.SPONSORIZEAZA
+      VALUES(:NEW.COD_SPONSOR,9,:NEW.INCEPUT_COLABORARE,:NEW.SFARSIT_COLABORARE); 
+   END IF; 
+  
+END; 
+/
+
+CREATE OR REPLACE TRIGGER TRIGGER_SPONSORIZARE_upd
+INSTEAD OF update ON VIZ_SPONSORIZARE  
+FOR EACH ROW  
+BEGIN 
+   IF :NEW.COD_SPORTIV='SPORTIV1' THEN 
+      update FRNMP_APP_SPORTIV1.SPONSORIZEAZA
+      set sfarsit_colaborare = :NEW.SFARSIT_COLABORARE
+      where cod_sportiv = 5 and cod_sponsor = :NEW.COD_SPONSOR;
+   END IF; 
+   
+   IF :NEW.COD_SPORTIV='SPORTIV2' THEN 
+      update FRNMP_APP_SPORTIV2.SPONSORIZEAZA
+      set sfarsit_colaborare = :NEW.SFARSIT_COLABORARE
+      where cod_sportiv = 6 and cod_sponsor = :NEW.COD_SPONSOR;
+   END IF; 
+   IF :NEW.COD_SPORTIV='SPORTIV3' THEN 
+      update FRNMP_APP_SPORTIV3.SPONSORIZEAZA
+      set sfarsit_colaborare = :NEW.SFARSIT_COLABORARE
+      where cod_sportiv = 7 and cod_sponsor = :NEW.COD_SPONSOR;
+   END IF; 
+   IF :NEW.COD_SPORTIV='SPORTIV4' THEN 
+     update FRNMP_APP_SPORTIV4.SPONSORIZEAZA
+      set sfarsit_colaborare = :NEW.SFARSIT_COLABORARE
+      where cod_sportiv = 8 and cod_sponsor = :NEW.COD_SPONSOR;
+   END IF; 
+   IF :NEW.COD_SPORTIV='SPORTIV5' THEN 
+       update FRNMP_APP_SPORTIV5.SPONSORIZEAZA
+      set sfarsit_colaborare = :NEW.SFARSIT_COLABORARE
+      where cod_sportiv = 9 and cod_sponsor = :NEW.COD_SPONSOR;
+   END IF; 
+  
+END; 
+/
+
+CREATE OR REPLACE VIEW VIZ_SPONSORIZARE_2 AS
+    SELECT COD_SPONSOR, INCEPUT_COLABORARE, SFARSIT_COLABORARE, cod_sportiv
+    FROM FRNMP_APP_SPORTIV1.SPONSORIZEAZA
+    UNION
+    SELECT COD_SPONSOR, INCEPUT_COLABORARE, SFARSIT_COLABORARE, cod_sportiv
+    FROM FRNMP_APP_SPORTIV2.SPONSORIZEAZA
+    UNION
+    SELECT COD_SPONSOR, INCEPUT_COLABORARE, SFARSIT_COLABORARE, cod_sportiv
+    FROM FRNMP_APP_SPORTIV3.SPONSORIZEAZA
+    UNION
+    SELECT COD_SPONSOR, INCEPUT_COLABORARE, SFARSIT_COLABORARE, cod_sportiv
+    FROM FRNMP_APP_SPORTIV4.SPONSORIZEAZA
+    UNION
+    SELECT COD_SPONSOR, INCEPUT_COLABORARE, SFARSIT_COLABORARE, cod_sportiv
+    FROM FRNMP_APP_SPORTIV5.SPONSORIZEAZA;
+/
+
+--inserari frnmp_reprezentant1
+INSERT INTO FRNMP_APP_ADMIN.VIZ_SPONSORIZARE VALUES
+(1,SYSDATE,TO_DATE('2025-03-01', 'yyyy-mm-dd'),'SPORTIV1');
+
+SELECT * FROM FRNMP_APP_ADMIN.viz_sponsorizare WHERE cod_sponsor=1;
+commit;
+
+--inserari frnmp_reprezentant2
+INSERT INTO FRNMP_APP_ADMIN.VIZ_SPONSORIZARE VALUES
+(2,SYSDATE-3,SYSDATE,'SPORTIV2');--18.01.2025 - 23.01.2025
+
+SELECT * FROM FRNMP_APP_ADMIN.viz_sponsorizare WHERE cod_sponsor=2;
+commit;
+rollback;
+
+update FRNMP_APP_ADMIN.viz_sponsorizare
+set SFARSIT_COLABORARE = TO_DATE('23-01-2025', 'DD-MM-YYYY')
+WHERE COD_SPORTIV = 'SPORTIV2'
+  AND COD_SPONSOR = 2;
+

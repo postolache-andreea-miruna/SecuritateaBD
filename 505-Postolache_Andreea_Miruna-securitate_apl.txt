@@ -1,0 +1,346 @@
+--aplicatii pe baza de date li securitatea datelor
+
+--exercitiul 6 a. Contextul aplicatiei
+--Antrenorii nu pot introduce sportivii la concursuri in weekend,
+--iar in timpul saptamanii doar in intervalul 9-17.
+--In ceea ce priveste arbitrii, acestia pot face modificari
+--ale datelor din tabela istoric doar in weekend 
+--si in ziua de luni cand sunt contestatiile
+
+--rulat ca SYS
+
+set serveroutput on;
+
+SELECT trim(TO_CHAR(SYSDATE, 'DAY', 'NLS_DATE_LANGUAGE=AMERICAN')) AS ZIUA_CURENTA
+FROM DUAL;
+
+CREATE OR REPLACE PROCEDURE proced_aplicatie_ctx IS
+v_ora number(2):= to_number(to_char(sysdate,'hh24'));
+v_zi_sapt VARCHAR2(10) := TO_CHAR(SYSDATE, 'DAY', 'NLS_DATE_LANGUAGE=AMERICAN');
+BEGIN
+    v_zi_sapt := TRIM(v_zi_sapt);
+    IF v_zi_sapt IN ('SATURDAY', 'SUNDAY') THEN
+            DBMS_OUTPUT.PUT_LINE('Nu puteti inscrie sportivii la competitii in weekend.');
+            DBMS_SESSION.SET_CONTEXT('APLICATIE_CTX', 'PROGRAM_POTRIVIT', 'NU');
+            DBMS_SESSION.SET_CONTEXT('APLICATIE_CTX', 'ARBITRAJ_POTRIVIT', 'DA');
+    ELSIF v_ora < 9 OR v_ora > 17 THEN
+        DBMS_OUTPUT.PUT_LINE('Nu puteti inscrie sportivii la competitii in afara programului.');
+        DBMS_SESSION.SET_CONTEXT('APLICATIE_CTX', 'PROGRAM_POTRIVIT', 'NU');
+    ELSE
+        DBMS_SESSION.SET_CONTEXT('APLICATIE_CTX', 'PROGRAM_POTRIVIT', 'DA');
+    END IF;
+    
+    IF v_zi_sapt = 'MONDAY' THEN
+        DBMS_SESSION.SET_CONTEXT('APLICATIE_CTX', 'ARBITRAJ_POTRIVIT', 'DA');
+    END IF;
+    
+    IF v_zi_sapt NOT IN ('MONDAY','SATURDAY', 'SUNDAY') THEN
+        DBMS_SESSION.SET_CONTEXT('APLICATIE_CTX', 'ARBITRAJ_POTRIVIT', 'NU');
+    END IF;
+END;
+/
+
+CREATE CONTEXT APLICATIE_CTX USING proced_aplicatie_ctx;
+
+EXEC proced_aplicatie_ctx(); 
+
+create or replace trigger tr_after_logon
+after logon
+on database  
+declare
+    v_utilizator varchar2(30):=sys_context('userenv','session_user');
+begin
+    if lower(v_utilizator) like 'frnmp_antrenor%' or lower(v_utilizator) like 'frnmp_arbitru%' then
+        proced_aplicatie_ctx();
+    end if;
+end;
+/
+
+
+--rulat ca ADMIN
+
+--pentru antrenori
+create or replace trigger inscriere_sp_trigger 
+before insert on frnmp_app_admin.ISTORIC
+begin
+    if sys_context('APLICATIE_CTX','PROGRAM_POTRIVIT') = 'NU' then
+        raise_application_error(-20001,'Sunteti in afara programului');
+    end if;
+end;
+/
+
+--pentru arbitrii
+create or replace trigger update_inscriere_sp_trigger 
+before UPDATE OF loc_per_gen, loc_per_categorie, timp_total, puncte on frnmp_app_admin.ISTORIC
+begin
+    if sys_context('APLICATIE_CTX','ARBITRAJ_POTRIVIT') = 'NU' then
+        raise_application_error(-20002,'Sunteti in afara programului de arbitrare si contestatii');
+    end if;
+end;
+/
+GRANT UPDATE (loc_per_gen, loc_per_categorie, timp_total, puncte) ON FRNMP_APP_ADMIN.ISTORIC TO FRNMP_ARBITRU1;
+SELECT sys_context('APLICATIE_CTX', 'PROGRAM_POTRIVIT') FROM dual;
+
+
+--6.b sql injection
+--Pentru un nume de club dat, nume de proba si un filtru pentru timpul total (de exemplu < 26) 
+--afisati numele,prenumele,numarul legitimatiei sportivului,
+--timpul total obtinut de acesta si numele competitiei la care l-a obtinute
+
+-- rulat ca admin
+
+CREATE OR REPLACE PROCEDURE sportivi_raport (
+    club_input IN VARCHAR2,
+    proba_input IN VARCHAR2,
+    filtru_timp_total IN VARCHAR2,
+    result OUT SYS_REFCURSOR
+) AS
+    cerere VARCHAR2(1000);
+BEGIN
+    cerere := 'SELECT u.nume, u.prenume, s.numar_legitimatie, i.timp_total,co.nume
+         FROM 
+         UTILIZATOR u
+         JOIN CLUB c ON u.cod_club = c.cod_club
+         JOIN SPORTIV s ON u.cod_utilizator = s.cod_sportiv
+         JOIN ISTORIC i ON s.cod_sportiv = i.cod_sportiv
+         JOIN COMPETITIE co ON i.cod_competitie = co.cod_competitie
+         WHERE c.cod_club IN 
+         (SELECT cod_club FROM club 
+        WHERE nume = ''' || club_input || '''
+         )
+         AND i.cod_proba IN 
+         (SELECT cod_proba FROM proba 
+        WHERE nume = ''' || proba_input || '''
+         )
+         AND timp_total ' || filtru_timp_total
+         ;
+
+    OPEN result FOR cerere;
+END;
+/
+
+--SELECT u.nume, u.prenume, s.numar_legitimatie, i.timp_total,co.nume
+--         FROM 
+--         UTILIZATOR u
+--         JOIN CLUB c ON u.cod_club = c.cod_club
+--         JOIN SPORTIV s ON u.cod_utilizator = s.cod_sportiv
+--         JOIN ISTORIC i ON s.cod_sportiv = i.cod_sportiv
+--         JOIN COMPETITIE co ON i.cod_competitie = co.cod_competitie
+--         WHERE c.cod_club IN 
+--         (SELECT cod_club FROM club 
+--        WHERE nume = 'AQUA TEAM'
+--         )
+--         AND i.cod_proba IN 
+--         (SELECT cod_proba FROM proba 
+--        WHERE nume = '50 LIBER'
+--         )
+--         AND timp_total < 26
+--         ;
+
+
+SELECT * FROM CLUB;
+SELECT * FROM ISTORIC;
+SELECT * FROM SPORTIV;
+SELECT * FROM UTILIZATOR; 
+SELECT * FROM PROBA;
+
+set serveroutput on;
+
+--cum s-ar folosi corect procedura
+
+DECLARE
+    result SYS_REFCURSOR;
+    nume VARCHAR2(20);
+    prenume VARCHAR2(20);
+    numar_legitimatie NUMBER(5);
+    timp_total NUMBER(5);
+    nume_comp VARCHAR2(30);
+BEGIN
+    sportivi_raport('AQUA TEAM','50 LIBER','< 26',result);
+    LOOP
+        FETCH result INTO nume, prenume, numar_legitimatie,timp_total, nume_comp;
+        EXIT WHEN result%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE(nume || ' ' || prenume || ' - ' || numar_legitimatie || ': ' || timp_total || 's la ' || nume_comp);
+    END LOOP;
+    CLOSE result;
+END;
+/
+
+
+--Injectare 1
+DECLARE
+    result SYS_REFCURSOR;
+    nume VARCHAR2(20);
+    prenume VARCHAR2(20);
+    numar_legitimatie NUMBER(5);
+    timp_total NUMBER(5);
+    nume_comp VARCHAR2(30);
+BEGIN
+    --sportivi_raport('AQUA TEAM'' OR 1=1 --','50 LIBER'' OR 1=1 --','is not null',result); -- acum arata tot din istoric
+    sportivi_raport_securizat('AQUA TEAM'' OR 1=1 --','50 LIBER'' OR 1=1 --','is not null',result);
+    LOOP
+        FETCH result INTO nume, prenume, numar_legitimatie,timp_total, nume_comp;
+        EXIT WHEN result%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE(nume || ' ' || prenume || ' - ' || numar_legitimatie || ': ' || timp_total || 's la ' || nume_comp);
+    END LOOP;
+    CLOSE result;
+END;
+/
+
+--inject 1.2 SQL Injection clasic bazat pe UNION
+--Atacatorul vrea sa afle numele, prenumele, codurile de utilizatori si username-urile pentru utilizatori
+--
+-- u.nume, u.prenume, s.numar_legitimatie, i.timp_total,co.nume
+-- coloanele din union trebuie sa faca match ca tip cu cele din query din procedura initiala. Acest fapt se face prin incercari
+--mai intai trebuie ca atacatorul sa gaseasca numraul corect de atribute care trebuie puse in union 
+--apoi trebuie potrivite tipurile atributelor
+
+DECLARE
+    result SYS_REFCURSOR;
+    nume VARCHAR2(20);
+    prenume VARCHAR2(20);
+    numar_legitimatie NUMBER(5);
+    timp_total NUMBER(5);
+    nume_comp VARCHAR2(30);
+BEGIN
+    --sportivi_raport('AQUA TEAM','50 LIBER','<26 UNION SELECT nume ,prenume, cod_utilizator,4, username FROM utilizator --',result); 
+    --sportivi_raport('AQUA TEAM','50 LIBER','IS NULL UNION SELECT nume ,prenume, cod_utilizator,4, username FROM utilizator --',result); 
+    sportivi_raport_securizat('AQUA TEAM','50 LIBER','< 26 UNION SELECT nume ,prenume, cod_utilizator,4, username FROM utilizator --',result); -- arata doar ceea ce trebuia sa se vada
+    LOOP
+        FETCH result INTO nume, prenume, numar_legitimatie,timp_total, nume_comp;
+        EXIT WHEN result%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE(nume || ' ' || prenume || ' - ' || numar_legitimatie || ': ' || timp_total || 's la ' || nume_comp);
+    END LOOP;
+    CLOSE result;
+END;
+/
+
+-- blind sql injection
+-- atacatorul vrea sa afle structura bazei de date
+DECLARE
+    result SYS_REFCURSOR;
+    nume VARCHAR2(20);
+    prenume VARCHAR2(20);
+    numar_legitimatie NUMBER(5);
+    timp_total NUMBER(5);
+    nume_comp VARCHAR2(30);
+BEGIN
+    sportivi_raport('AQUA TEAM','50 LIBER',' IS NOT NULL AND SUBSTR((SELECT table_name FROM all_tables WHERE ROWNUM = 1), 1, 1) = ''B'' --',result); -- prima litera a primului tabel nu este B 
+    --sportivi_raport('AQUA TEAM','50 LIBER',' IS NOT NULL AND SUBSTR((SELECT table_name FROM all_tables WHERE ROWNUM = 1), 1, 1) = ''D'' --',result); -- prima litera a primului tabel este D 
+    --sportivi_raport('AQUA TEAM','50 LIBER',' IS NOT NULL AND SUBSTR((SELECT table_name FROM all_tables WHERE ROWNUM = 1), 2, 1) = ''U'' --',result);
+    
+    --sportivi_raport_securizat('AQUA TEAM','50 LIBER',' IS NOT NULL AND SUBSTR((SELECT table_name FROM all_tables WHERE ROWNUM = 1), 1, 1) = ''D'' --',result); -- prima litera a primului tabel este D
+    --sportivi_raport_securizat('AQUA TEAM','50 LIBER',' IS NOT NULL AND SUBSTR((SELECT table_name FROM all_tables WHERE ROWNUM = 1), 1, 1) = ''B'' --',result); -- prima litera a primului tabel nu este B 
+    LOOP
+        FETCH result INTO nume, prenume, numar_legitimatie,timp_total, nume_comp;
+        EXIT WHEN result%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE(nume || ' ' || prenume || ' - ' || numar_legitimatie || ': ' || timp_total || ' la ' || nume_comp);
+    END LOOP;
+    CLOSE result;
+END;
+/
+
+
+
+
+--rezolvare pentru ca procedura sa nu mai fie vulnerabila la SQL Injection 
+CREATE OR REPLACE PROCEDURE sportivi_raport_securizat (
+    club_input IN VARCHAR2,
+    proba_input IN VARCHAR2,
+    filtru_timp_total IN VARCHAR2,
+    result OUT SYS_REFCURSOR
+) AUTHID CURRENT_USER AS
+    sanitized_club_input VARCHAR2(100);
+    sanitized_proba_input VARCHAR2(100);
+    sanitizied_timp_total VARCHAR2(100);
+    
+    valid_operator BOOLEAN := FALSE;
+    valid_filtru_timp_total VARCHAR2(100);
+    used_operator VARCHAR2(4);
+BEGIN
+    -- Reducerea intrarilor arbitrare
+    --validarea parametrului club_input 
+    IF LENGTH(club_input) > 50 THEN
+        RAISE_APPLICATION_ERROR(-20010,'Error');
+    END IF;
+    
+    --DBMS_ASSERT pentru validare club_input
+    sanitized_club_input := DBMS_ASSERT.enquote_literal(club_input);
+    IF sanitized_club_input IS NULL THEN
+        RAISE_APPLICATION_ERROR(-20011,'Error');
+    END IF;
+    sanitized_club_input := REPLACE(sanitized_club_input,chr(39),'');
+    
+    
+    -- Reducerea intrarilor arbitrare
+    --validarea parametrului proba_input 
+    IF LENGTH(proba_input) > 30 THEN
+        RAISE_APPLICATION_ERROR(-20012,'Error');
+    END IF;
+    
+    --DBMS_ASSERT pentru validare club_input
+    sanitized_proba_input := DBMS_ASSERT.enquote_literal(proba_input);
+    IF sanitized_proba_input IS NULL THEN
+        RAISE_APPLICATION_ERROR(-20013,'Error');
+    END IF;
+    sanitized_proba_input := REPLACE(sanitized_proba_input,chr(39),'');
+    
+    --validare dimensiune filtru
+    IF filtru_timp_total IS NULL OR LENGTH(filtru_timp_total) < 3 THEN
+        RAISE_APPLICATION_ERROR(-20014,'Error');
+    END IF;
+    
+    --validare operator de comparatie
+    IF filtru_timp_total LIKE '<%' THEN
+        valid_operator := TRUE;
+        used_operator := '<';
+    ELSIF filtru_timp_total LIKE '>%' THEN
+        valid_operator := TRUE;
+        used_operator := '>';
+    ELSIF filtru_timp_total LIKE '=%' THEN
+        valid_operator := TRUE;
+        used_operator := '=';
+    ELSIF filtru_timp_total LIKE '<=%' THEN
+        valid_operator := TRUE;
+        used_operator := '<=';
+    ELSIF filtru_timp_total LIKE '>=%' THEN
+        valid_operator := TRUE;
+        used_operator := '>=';
+    END IF;
+    
+    IF NOT valid_operator THEN
+        RAISE_APPLICATION_ERROR(-20015,'Error');
+    END IF;
+    
+    sanitizied_timp_total := REGEXP_SUBSTR(filtru_timp_total,'\d+(\.\d+)?');
+    
+    IF sanitizied_timp_total IS NULL THEN
+        RAISE_APPLICATION_ERROR(-20016,'Error');
+    END IF;
+    
+    valid_filtru_timp_total := used_operator || ' :timp_total';
+    
+    OPEN result FOR 
+        'SELECT u.nume, u.prenume, s.numar_legitimatie, i.timp_total,co.nume
+         FROM 
+         UTILIZATOR u
+         JOIN CLUB c ON u.cod_club = c.cod_club
+         JOIN SPORTIV s ON u.cod_utilizator = s.cod_sportiv
+         JOIN ISTORIC i ON s.cod_sportiv = i.cod_sportiv
+         JOIN COMPETITIE co ON i.cod_competitie = co.cod_competitie
+         WHERE c.cod_club IN 
+         (SELECT cod_club FROM club 
+        WHERE nume =: club
+         )
+         AND i.cod_proba IN 
+         (SELECT cod_proba FROM proba 
+        WHERE nume =: proba
+         )
+         AND timp_total ' || valid_filtru_timp_total
+    USING sanitized_club_input,sanitized_proba_input,sanitizied_timp_total
+         ;
+
+END;
+/
+
+
